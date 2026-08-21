@@ -738,22 +738,35 @@ class GoldTradingBot:
                 
                 # Generate PDE signals
                 df_pde = strategy.generate_signals(df_pde)
-                latest = df_pde.iloc[-1]
                 
-                if latest['signal'] == 0 or pd.isna(latest.get('entry_price')):
-                    zone_name = latest.get('pde_zone', 'equilibrium')
-                    logger.info(f"  \\- {symbol}: No PDE signal (Zone: {zone_name}, Price: {latest['close']:.5f}) - NO TRADE")
+                # Evaluate the most recently COMPLETED/CLOSED candle (iloc[-2]) to avoid false mid-candle fluctuations
+                # (iloc[-1] is the uncompleted in-progress live candle which fluctuates before the period finishes)
+                confirmed_bar = df_pde.iloc[-2] if len(df_pde) >= 2 else df_pde.iloc[-1]
+                live_bar = df_pde.iloc[-1]
+                
+                if confirmed_bar['signal'] == 0 or pd.isna(confirmed_bar.get('entry_price')):
+                    zone_name = confirmed_bar.get('pde_zone', 'equilibrium')
+                    logger.info(f"  \\- {symbol}: No PDE signal on confirmed candle (Zone: {zone_name}, Price: {live_bar['close']:.5f}) - NO TRADE")
                     return
                 
-                signal_direction = int(latest['signal'])
-                signal_type = "BUY" if signal_direction > 0 else "SELL"
-                entry_price = float(latest['entry_price'])
-                stop_loss = float(latest['stop_loss'])
-                take_profit = float(latest['take_profit'])
-                rr_ratio = float(latest.get('rr_tp2', 1.5))
-                zone_name = str(latest.get('pde_zone', ''))
+                # Check if we already traded this exact completed candle bar to prevent duplicates
+                bar_time = str(confirmed_bar.get('time', ''))
+                if not hasattr(self, '_last_pde_trade_bars'):
+                    self._last_pde_trade_bars = {}
                 
-                logger.info(f"  +- {symbol}: [PDE SIGNAL TRIGGERED] {signal_type} in {zone_name.upper()} ZONE! Entry: {entry_price:.5f}, SL: {stop_loss:.5f}, TP: {take_profit:.5f}, RR: {rr_ratio:.2f}")
+                if bar_time and self._last_pde_trade_bars.get(symbol) == bar_time:
+                    logger.info(f"  \\- {symbol}: PDE signal on closed bar {bar_time} already executed - WAITING for next bar")
+                    return
+                
+                signal_direction = int(confirmed_bar['signal'])
+                signal_type = "BUY" if signal_direction > 0 else "SELL"
+                entry_price = float(live_bar['close'])  # Execute at current live market price
+                stop_loss = float(confirmed_bar.get('stop_loss', confirmed_bar.get('sl', 0.0)))
+                take_profit = float(confirmed_bar.get('take_profit', confirmed_bar.get('tp2', confirmed_bar.get('tp1', 0.0))))
+                rr_ratio = float(confirmed_bar.get('rr_tp2', 1.5))
+                zone_name = str(confirmed_bar.get('pde_zone', ''))
+                
+                logger.info(f"  +- {symbol}: [PDE SIGNAL TRIGGERED on CLOSED BAR {bar_time}] {signal_type} in {zone_name.upper()} ZONE! Entry: {entry_price:.5f}, SL: {stop_loss:.5f}, TP: {take_profit:.5f}, RR: {rr_ratio:.2f}")
                 
                 # Check correlation risk
                 if not executor.check_correlation_risk(symbol, signal_direction):
@@ -783,6 +796,7 @@ class GoldTradingBot:
                 )
                 
                 if trade_id:
+                    self._last_pde_trade_bars[symbol] = bar_time
                     logger.info(f"[SUCCESS] {symbol} PDE trade opened with ID: {trade_id}")
                     if self.telegram.enabled:
                         self.telegram.send_message(
