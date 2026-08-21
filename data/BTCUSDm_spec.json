@@ -1,0 +1,16 @@
+{
+  "symbol": "BTCUSDm",
+  "digits": 2,
+  "point": 0.01,
+  "spread_points": 1000,
+  "contract_size": 1.0,
+  "volume_min": 0.01,
+  "volume_max": 200.0,
+  "volume_step": 0.01,
+  "currency_base": "BTC",
+  "currency_profit": "USD",
+  "tick_size": 0.01,
+  "tick_value": 1.01729,
+  "margin_initial": 1.0,
+  "server_time": "2026-08-14 21:47:40.054745+00:00"
+}

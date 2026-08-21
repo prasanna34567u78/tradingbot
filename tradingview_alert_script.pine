@@ -1,0 +1,260 @@
+// Gold Trading Bot - TradingView Alert Script
+// This Pine Script identifies SMC/ICT patterns and can send alerts to the trading bot
+
+//@version=5
+indicator("SMC Trading Bot Signals", overlay=true)
+
+// Input parameters
+riskRewardRatio = input.float(2.0, "Risk-Reward Ratio", minval=1.0, step=0.1)
+swingLookback = input.int(10, "Swing Point Lookback", minval=5)
+showOrderBlocks = input.bool(true, "Show Order Blocks")
+showFVG = input.bool(true, "Show Fair Value Gaps")
+showLiquidity = input.bool(true, "Show Liquidity Levels")
+
+// Function to identify swing highs and lows
+swingHigh = ta.pivothigh(high, swingLookback, swingLookback)
+swingLow = ta.pivotlow(low, swingLookback, swingLookback)
+
+// Plot swing points
+plotshape(swingHigh, "Swing High", shape.circle, location.abovebar, color.red, size=size.tiny)
+plotshape(swingLow, "Swing Low", shape.circle, location.belowbar, color.green, size=size.tiny)
+
+// Identify higher highs, lower lows, etc.
+var float prevSwingHigh = na
+var float prevSwingLow = na
+var bool higherHigh = na
+var bool lowerLow = na
+var bool higherLow = na
+var bool lowerHigh = na
+
+if not na(swingHigh)
+    higherHigh := not na(prevSwingHigh) and swingHigh > prevSwingHigh
+    lowerHigh := not na(prevSwingHigh) and swingHigh < prevSwingHigh
+    prevSwingHigh := swingHigh
+
+if not na(swingLow)
+    higherLow := not na(prevSwingLow) and swingLow > prevSwingLow
+    lowerLow := not na(prevSwingLow) and swingLow < prevSwingLow
+    prevSwingLow := swingLow
+
+// Identify break of structure
+bosBullish = lowerLow[1] and close > high[1]
+bosBearish = higherHigh[1] and close < low[1]
+
+// Plot BOS
+plotshape(bosBullish, "Bullish BOS", shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(bosBearish, "Bearish BOS", shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// Identify liquidity levels (clusters of swing highs/lows)
+var float[] liquidityHighs = array.new_float(0)
+var float[] liquidityLows = array.new_float(0)
+var int[] liquidityHighBars = array.new_int(0)
+var int[] liquidityLowBars = array.new_int(0)
+
+if not na(swingHigh)
+    // Check if this swing high is close to any existing liquidity level
+    bool foundMatch = false
+    for i = 0 to array.size(liquidityHighs) - 1
+        if math.abs(swingHigh - array.get(liquidityHighs, i)) / swingHigh < 0.002  // Within 0.2%
+            foundMatch := true
+            break
+    if not foundMatch
+        array.push(liquidityHighs, swingHigh)
+        array.push(liquidityHighBars, bar_index)
+
+if not na(swingLow)
+    // Check if this swing low is close to any existing liquidity level
+    bool foundMatch = false
+    for i = 0 to array.size(liquidityLows) - 1
+        if math.abs(swingLow - array.get(liquidityLows, i)) / swingLow < 0.002  // Within 0.2%
+            foundMatch := true
+            break
+    if not foundMatch
+        array.push(liquidityLows, swingLow)
+        array.push(liquidityLowBars, bar_index)
+
+// Identify liquidity sweeps
+sweepHigh = false
+sweepLow = false
+
+// Check for high sweeps
+for i = 0 to array.size(liquidityHighs) - 1
+    liqPrice = array.get(liquidityHighs, i)
+    liqBar = array.get(liquidityHighBars, i)
+    if bar_index - liqBar <= 20 and bar_index - liqBar >= 1  // Within last 20 bars
+        if high > liqPrice and high[1] <= liqPrice  // Price just exceeded liquidity level
+            if close < open and close < liqPrice  // Bearish candle that closes below liquidity
+                sweepHigh := true
+                break
+
+// Check for low sweeps
+for i = 0 to array.size(liquidityLows) - 1
+    liqPrice = array.get(liquidityLows, i)
+    liqBar = array.get(liquidityLowBars, i)
+    if bar_index - liqBar <= 20 and bar_index - liqBar >= 1  // Within last 20 bars
+        if low < liqPrice and low[1] >= liqPrice  // Price just exceeded liquidity level
+            if close > open and close > liqPrice  // Bullish candle that closes above liquidity
+                sweepLow := true
+                break
+
+// Plot liquidity sweeps
+plotshape(sweepHigh, "Liquidity Sweep High", shape.xcross, location.abovebar, color.fuchsia, size=size.normal)
+plotshape(sweepLow, "Liquidity Sweep Low", shape.xcross, location.belowbar, color.fuchsia, size=size.normal)
+
+// Identify order blocks
+bullishOB = false
+bearishOB = false
+var float bullishOBHigh = na
+var float bullishOBLow = na
+var float bearishOBHigh = na
+var float bearishOBLow = na
+
+// Bullish order block: last down candle before a strong move up
+if close[3] < open[3] and close[2] > open[2] and high[1] > high[2] * 1.005
+    bullishOB := true
+    bullishOBHigh := high[3]
+    bullishOBLow := low[3]
+
+// Bearish order block: last up candle before a strong move down
+if close[3] > open[3] and close[2] < open[2] and low[1] < low[2] * 0.995
+    bearishOB := true
+    bearishOBHigh := high[3]
+    bearishOBLow := low[3]
+
+// Plot order blocks
+if showOrderBlocks
+    var bullishOBBoxes = array.new_box(0)
+    var bearishOBBoxes = array.new_box(0)
+    
+    if bullishOB
+        box newBox = box.new(bar_index[3], bullishOBHigh, bar_index, bullishOBLow, bgcolor=color.new(color.green, 80), border_color=color.green)
+        array.push(bullishOBBoxes, newBox)
+    
+    if bearishOB
+        box newBox = box.new(bar_index[3], bearishOBHigh, bar_index, bearishOBLow, bgcolor=color.new(color.red, 80), border_color=color.red)
+        array.push(bearishOBBoxes, newBox)
+    
+    // Remove old boxes
+    if array.size(bullishOBBoxes) > 5
+        box.delete(array.shift(bullishOBBoxes))
+    
+    if array.size(bearishOBBoxes) > 5
+        box.delete(array.shift(bearishOBBoxes))
+
+// Identify fair value gaps (FVGs)
+bullishFVG = false
+bearishFVG = false
+var float bullishFVGHigh = na
+var float bullishFVGLow = na
+var float bearishFVGHigh = na
+var float bearishFVGLow = na
+
+// Bullish FVG (gap up)
+if low > high[2]
+    bullishFVG := true
+    bullishFVGHigh := low
+    bullishFVGLow := high[2]
+
+// Bearish FVG (gap down)
+if high < low[2]
+    bearishFVG := true
+    bearishFVGHigh := low[2]
+    bearishFVGLow := high
+
+// Plot FVGs
+if showFVG
+    var bullishFVGBoxes = array.new_box(0)
+    var bearishFVGBoxes = array.new_box(0)
+    
+    if bullishFVG
+        box newBox = box.new(bar_index[1], bullishFVGHigh, bar_index, bullishFVGLow, bgcolor=color.new(color.blue, 80), border_color=color.blue)
+        array.push(bullishFVGBoxes, newBox)
+    
+    if bearishFVG
+        box newBox = box.new(bar_index[1], bearishFVGHigh, bar_index, bearishFVGLow, bgcolor=color.new(color.purple, 80), border_color=color.purple)
+        array.push(bearishFVGBoxes, newBox)
+    
+    // Remove old boxes
+    if array.size(bullishFVGBoxes) > 5
+        box.delete(array.shift(bullishFVGBoxes))
+    
+    if array.size(bearishFVGBoxes) > 5
+        box.delete(array.shift(bearishFVGBoxes))
+
+// Generate trading signals
+buySignal = false
+sellSignal = false
+var float entryPrice = na
+var float stopLoss = na
+var float takeProfit = na
+var string signalType = na
+
+// Strategy 1: Liquidity Sweep + Break of Structure
+if sweepLow and bosBullish
+    buySignal := true
+    entryPrice := close
+    stopLoss := math.min(low, array.get(liquidityLows, array.size(liquidityLows) - 1)) - syminfo.mintick * 10
+    takeProfit := entryPrice + (entryPrice - stopLoss) * riskRewardRatio
+    signalType := "Liquidity Sweep + BOS (Buy)"
+
+if sweepHigh and bosBearish
+    sellSignal := true
+    entryPrice := close
+    stopLoss := math.max(high, array.get(liquidityHighs, array.size(liquidityHighs) - 1)) + syminfo.mintick * 10
+    takeProfit := entryPrice - (stopLoss - entryPrice) * riskRewardRatio
+    signalType := "Liquidity Sweep + BOS (Sell)"
+
+// Strategy 2: Return to Order Block or FVG
+if not buySignal and not sellSignal
+    // Check for price returning to bearish order block or bearish FVG
+    if bearishOB and low <= bearishOBHigh and high >= bearishOBLow and close > open
+        buySignal := true
+        entryPrice := close
+        stopLoss := bearishOBLow - syminfo.mintick * 10
+        takeProfit := entryPrice + (entryPrice - stopLoss) * riskRewardRatio
+        signalType := "Bearish OB Return (Buy)"
+    
+    if bearishFVG and low <= bearishFVGHigh and high >= bearishFVGLow and close > open
+        buySignal := true
+        entryPrice := close
+        stopLoss := bearishFVGLow - syminfo.mintick * 10
+        takeProfit := entryPrice + (entryPrice - stopLoss) * riskRewardRatio
+        signalType := "Bearish FVG Return (Buy)"
+    
+    // Check for price returning to bullish order block or bullish FVG
+    if bullishOB and low <= bullishOBHigh and high >= bullishOBLow and close < open
+        sellSignal := true
+        entryPrice := close
+        stopLoss := bullishOBHigh + syminfo.mintick * 10
+        takeProfit := entryPrice - (stopLoss - entryPrice) * riskRewardRatio
+        signalType := "Bullish OB Return (Sell)"
+    
+    if bullishFVG and low <= bullishFVGHigh and high >= bullishFVGLow and close < open
+        sellSignal := true
+        entryPrice := close
+        stopLoss := bullishFVGHigh + syminfo.mintick * 10
+        takeProfit := entryPrice - (stopLoss - entryPrice) * riskRewardRatio
+        signalType := "Bullish FVG Return (Sell)"
+
+// Plot signals
+plotshape(buySignal, "Buy Signal", shape.triangleup, location.belowbar, color.green, size=size.large)
+plotshape(sellSignal, "Sell Signal", shape.triangledown, location.abovebar, color.red, size=size.large)
+
+// Plot stop loss and take profit levels
+plot(buySignal or sellSignal ? stopLoss : na, "Stop Loss", color.red, 2, plot.style_cross)
+plot(buySignal or sellSignal ? takeProfit : na, "Take Profit", color.green, 2, plot.style_cross)
+
+// Alert conditions
+alertcondition(buySignal, "Buy Signal", "SMC Buy Signal: " + signalType)
+alertcondition(sellSignal, "Sell Signal", "SMC Sell Signal: " + signalType)
+
+// Create alert message for webhook
+alertMessage = ""
+if buySignal
+    alertMessage := '{"symbol":"' + syminfo.ticker + '","action":"buy","price":' + str.tostring(entryPrice) + ',"stop_loss":' + str.tostring(stopLoss) + ',"take_profit":' + str.tostring(takeProfit) + ',"signal_type":"' + signalType + '"}'
+if sellSignal
+    alertMessage := '{"symbol":"' + syminfo.ticker + '","action":"sell","price":' + str.tostring(entryPrice) + ',"stop_loss":' + str.tostring(stopLoss) + ',"take_profit":' + str.tostring(takeProfit) + ',"signal_type":"' + signalType + '"}'
+
+// Add alert message to chart
+if buySignal or sellSignal
+    label.new(bar_index, high + syminfo.mintick * 20, alertMessage, color=color.blue, style=label.style_label_down, size=size.tiny)
