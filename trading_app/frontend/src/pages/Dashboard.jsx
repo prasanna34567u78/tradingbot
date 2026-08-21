@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAccountStore } from '../store/accountStore';
 import { usePositionsStore } from '../store/positionsStore';
 import { useConfigStore } from '../store/configStore';
 import { useAnalyticsStore } from '../store/analyticsStore';
 import { MetricCard } from '../components/MetricCard';
 import { EquityChart } from '../components/EquityChart';
-import { Wallet, TrendingUp, Cpu, Award, Zap, PieChart as PieIcon, Activity, CheckCircle, AlertCircle } from 'lucide-react';
+import { Wallet, TrendingUp, Cpu, Award, Zap, PieChart as PieIcon, Activity, CheckCircle, AlertCircle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const SYMBOL_COLORS = {
@@ -18,6 +18,11 @@ const SYMBOL_COLORS = {
 const DEFAULT_COLORS = ['#d29922', '#f78166', '#58a6ff', '#00d395', '#a371f7'];
 
 export const Dashboard = () => {
+  const [feedSearch, setFeedSearch] = useState('');
+  const [feedDirection, setFeedDirection] = useState('ALL');
+  const [feedPage, setFeedPage] = useState(1);
+  const [feedPageSize, setFeedPageSize] = useState(5);
+
   const account = useAccountStore((state) => state.account);
   const positions = usePositionsStore((state) => state.positions);
   const config = useConfigStore((state) => state.config);
@@ -47,6 +52,19 @@ export const Dashboard = () => {
 
   const hasDonutData = donutData.length > 0 && totalVolume > 0;
   const hasActivityData = Array.isArray(activityFeed) && activityFeed.length > 0;
+
+  // Activity Feed Filter & Pagination Logic
+  const filteredFeed = (activityFeed || []).filter((act) => {
+    const matchesDir = feedDirection === 'ALL' || act.direction === feedDirection;
+    const matchesSearch = !feedSearch || 
+      act.symbol?.toLowerCase().includes(feedSearch.toLowerCase()) ||
+      act.detail?.toLowerCase().includes(feedSearch.toLowerCase()) ||
+      act.time?.includes(feedSearch);
+    return matchesDir && matchesSearch;
+  });
+
+  const totalFeedPages = Math.max(1, Math.ceil(filteredFeed.length / feedPageSize));
+  const displayedFeed = filteredFeed.slice((feedPage - 1) * feedPageSize, feedPage * feedPageSize);
 
   return (
     <div className="space-y-6 pb-12">
@@ -197,9 +215,71 @@ export const Dashboard = () => {
 
       {/* Recent Activity Feed */}
       <div className="bg-cardBg border border-borderColor p-5 rounded-2xl shadow-lg space-y-4">
-        <div className="flex items-center gap-2">
-          <Activity size={18} className="text-accentBlue" />
-          <h3 className="font-bold text-white text-sm">Recent Trade Activity Feed</h3>
+        {/* Header & Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-borderColor/60 pb-3">
+          <div className="flex items-center gap-2">
+            <Activity size={18} className="text-accentBlue" />
+            <h3 className="font-bold text-white text-sm">Recent Trade Activity Feed</h3>
+            {activityFeed.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-accentBlue/20 text-accentBlue border border-accentBlue/30">
+                {filteredFeed.length} Events
+              </span>
+            )}
+          </div>
+
+          {/* Filter, Search & Page Controls */}
+          {hasActivityData && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {/* Direction Filter Pills */}
+              <div className="flex items-center gap-1 bg-darkBg border border-borderColor p-0.5 rounded-lg font-mono text-[11px]">
+                {['ALL', 'BUY', 'SELL'].map((dir) => (
+                  <button
+                    key={dir}
+                    onClick={() => {
+                      setFeedDirection(dir);
+                      setFeedPage(1);
+                    }}
+                    className={`px-2.5 py-0.5 rounded-md font-bold transition ${
+                      feedDirection === dir
+                        ? 'bg-accentBlue text-white shadow'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {dir}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Box */}
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-2 text-gray-500" />
+                <input
+                  type="text"
+                  value={feedSearch}
+                  onChange={(e) => {
+                    setFeedSearch(e.target.value);
+                    setFeedPage(1);
+                  }}
+                  placeholder="Search activity..."
+                  className="bg-darkBg border border-borderColor rounded-lg pl-7 pr-2.5 py-1 text-white placeholder-gray-500 focus:outline-none focus:border-accentBlue text-xs font-mono w-44"
+                />
+              </div>
+
+              {/* Page Size */}
+              <select
+                value={feedPageSize}
+                onChange={(e) => {
+                  setFeedPageSize(Number(e.target.value));
+                  setFeedPage(1);
+                }}
+                className="bg-darkBg border border-borderColor text-gray-300 rounded-lg px-2 py-1 text-xs font-mono cursor-pointer"
+              >
+                <option value={5}>5 / page</option>
+                <option value={10}>10 / page</option>
+                <option value={20}>20 / page</option>
+              </select>
+            </div>
+          )}
         </div>
 
         {!hasActivityData ? (
@@ -210,9 +290,13 @@ export const Dashboard = () => {
               Order open/close events from MetaTrader 5 will stream here in real-time.
             </p>
           </div>
+        ) : filteredFeed.length === 0 ? (
+          <div className="p-6 text-center bg-darkBg/40 border border-borderColor/50 rounded-xl">
+            <p className="text-xs text-gray-400">No activity events match your filter criteria.</p>
+          </div>
         ) : (
           <div className="space-y-2 text-xs">
-            {activityFeed.map((act, i) => (
+            {displayedFeed.map((act, i) => (
               <div key={i} className="flex items-center justify-between p-3 bg-darkBg rounded-xl border border-borderColor/60 hover:border-borderColor transition">
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-gray-500 text-[11px]">{act.time}</span>
@@ -228,6 +312,34 @@ export const Dashboard = () => {
                 <span className="text-gray-300 font-mono">{act.detail}</span>
               </div>
             ))}
+
+            {/* Pagination Controls */}
+            {filteredFeed.length > feedPageSize && (
+              <div className="pt-2 flex items-center justify-between border-t border-borderColor/50 text-xs font-mono text-gray-400">
+                <span className="text-[11px]">
+                  Showing {(feedPage - 1) * feedPageSize + 1} - {Math.min(feedPage * feedPageSize, filteredFeed.length)} of {filteredFeed.length}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setFeedPage((p) => Math.max(1, p - 1))}
+                    disabled={feedPage === 1}
+                    className="px-2.5 py-1 bg-darkBg border border-borderColor rounded text-gray-300 disabled:opacity-30 hover:text-white flex items-center gap-1"
+                  >
+                    <ChevronLeft size={13} /> Prev
+                  </button>
+                  <span className="px-2 py-0.5 bg-accentBlue/10 text-accentBlue border border-accentBlue/30 rounded font-bold text-[11px]">
+                    Page {feedPage} of {totalFeedPages}
+                  </span>
+                  <button
+                    onClick={() => setFeedPage((p) => Math.min(totalFeedPages, p + 1))}
+                    disabled={feedPage >= totalFeedPages}
+                    className="px-2.5 py-1 bg-darkBg border border-borderColor rounded text-gray-300 disabled:opacity-30 hover:text-white flex items-center gap-1"
+                  >
+                    Next <ChevronRight size={13} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
