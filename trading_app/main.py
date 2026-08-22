@@ -742,6 +742,13 @@ class GoldTradingBot:
                     logger.warning(f"  \\- {symbol}: Insufficient historical data on {pde_tf} - SKIPPED")
                     return
                 
+                # Dynamically sync symbol-specific Min R:R Ratio from UI configuration
+                sym_min_rr = symbol_config.get('min_rr_ratio')
+                if sym_min_rr is None:
+                    sym_min_rr = getattr(config, 'PDE_SETTINGS', {}).get('min_rr', 1.5)
+                if hasattr(strategy, 'pde_engine'):
+                    strategy.pde_engine.min_rr = float(sym_min_rr)
+
                 # Generate PDE signals
                 df_pde = strategy.generate_signals(df_pde)
                 
