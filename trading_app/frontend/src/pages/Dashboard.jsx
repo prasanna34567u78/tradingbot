@@ -299,17 +299,19 @@ export const Dashboard = () => {
             {displayedFeed.map((act, i) => (
               <div key={i} className="flex items-center justify-between p-3 bg-darkBg rounded-xl border border-borderColor/60 hover:border-borderColor transition">
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-gray-500 text-[11px]">{act.time}</span>
-                  <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase border ${
+                  <span className="font-mono text-gray-400 bg-gray-800/80 px-2 py-0.5 rounded border border-gray-700/50 text-[10px] whitespace-nowrap shrink-0">
+                    {act.time}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase border shrink-0 ${
                     act.type === 'open'
                       ? 'bg-accentBlue/20 text-accentBlue border-accentBlue/30'
                       : (act.type === 'close_profit' ? 'bg-accentGreen/20 text-accentGreen border-accentGreen/30' : 'bg-accentRed/20 text-accentRed border-accentRed/30')
                   }`}>
                     {act.direction}
                   </span>
-                  <span className="font-bold text-white">{act.symbol}</span>
+                  <span className="font-bold text-white shrink-0">{act.symbol}</span>
                 </div>
-                <span className="text-gray-300 font-mono">{act.detail}</span>
+                <span className="text-gray-300 font-mono text-right">{act.detail}</span>
               </div>
             ))}
 

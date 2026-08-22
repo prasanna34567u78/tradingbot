@@ -482,7 +482,8 @@ def fetch_real_history_and_analytics():
                             })
 
                             recent_activity.append({
-                                "time": datetime.fromtimestamp(out_deal.time).strftime("%H:%M:%S"),
+                                "time": datetime.fromtimestamp(out_deal.time).strftime("%Y-%m-%d %H:%M:%S"),
+                                "date": datetime.fromtimestamp(out_deal.time).strftime("%Y-%m-%d"),
                                 "type": "close_profit" if profit >= 0 else "close_loss",
                                 "symbol": sym,
                                 "direction": direction,
@@ -491,7 +492,8 @@ def fetch_real_history_and_analytics():
                         elif in_deal:
                             direction = "BUY" if in_deal.type == 0 else "SELL"
                             recent_activity.append({
-                                "time": datetime.fromtimestamp(in_deal.time).strftime("%H:%M:%S"),
+                                "time": datetime.fromtimestamp(in_deal.time).strftime("%Y-%m-%d %H:%M:%S"),
+                                "date": datetime.fromtimestamp(in_deal.time).strftime("%Y-%m-%d"),
                                 "type": "open",
                                 "symbol": sym,
                                 "direction": direction,
