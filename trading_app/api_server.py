@@ -477,7 +477,10 @@ def fetch_real_history_and_analytics():
 
                             equity_curve.append({
                                 "time": datetime.fromtimestamp(out_deal.time).strftime("%b %d %H:%M"),
+                                "date": datetime.fromtimestamp(out_deal.time).strftime("%Y-%m-%d"),
+                                "timestamp": int(out_deal.time * 1000),
                                 "equity": round(curr_equity, 2),
+                                "pnl": round(profit, 2),
                                 "trade": "win" if profit >= 0 else "loss"
                             })
 
@@ -503,7 +506,10 @@ def fetch_real_history_and_analytics():
                     acc = fetch_account_data()
                     equity_curve.append({
                         "time": "Now",
-                        "equity": round(acc["equity"], 2),
+                        "date": datetime.now().strftime("%Y-%m-%d"),
+                        "timestamp": int(time.time() * 1000),
+                        "equity": round(acc.get("equity", 0.0), 2),
+                        "pnl": 0.0,
                         "trade": "live"
                     })
         except Exception as e:
