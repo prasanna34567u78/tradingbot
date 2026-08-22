@@ -758,8 +758,33 @@ class GoldTradingBot:
                 live_bar = df_pde.iloc[-1]
                 
                 if confirmed_bar['signal'] == 0 or pd.isna(confirmed_bar.get('entry_price')):
-                    zone_name = confirmed_bar.get('pde_zone', 'equilibrium')
-                    logger.info(f"  \\- {symbol}: No PDE signal on confirmed candle (Zone: {zone_name}, Price: {live_bar['close']:.5f}) - NO TRADE")
+                    zone_name = str(confirmed_bar.get('pde_zone', 'equilibrium'))
+                    rsi_val = float(confirmed_bar.get('rsi', 0.0)) if pd.notna(confirmed_bar.get('rsi')) else None
+                    bar_bull = confirmed_bar['close'] > confirmed_bar['open']
+                    candle_color = "GREEN" if bar_bull else ("RED" if confirmed_bar['close'] < confirmed_bar['open'] else "DOJI")
+                    
+                    # Detailed diagnostic reasons
+                    reasons = []
+                    if zone_name not in ['discount', 'premium']:
+                        reasons.append(f"Zone is {zone_name.upper()} (needs DISCOUNT for BUY or PREMIUM for SELL)")
+                    elif zone_name == 'discount':
+                        if rsi_val is not None and rsi_val > 42.0:
+                            reasons.append(f"RSI {rsi_val:.1f} > 42.0 (not oversold)")
+                        if not bar_bull:
+                            reasons.append("Candle is RED (needs GREEN bullish confirmation)")
+                        if (rsi_val is None or rsi_val <= 42.0) and bar_bull:
+                            reasons.append(f"R:R below required {float(sym_min_rr):.2f}x")
+                    elif zone_name == 'premium':
+                        if rsi_val is not None and rsi_val < 58.0:
+                            reasons.append(f"RSI {rsi_val:.1f} < 58.0 (not overbought)")
+                        if bar_bull:
+                            reasons.append("Candle is GREEN (needs RED bearish confirmation)")
+                        if (rsi_val is None or rsi_val >= 58.0) and not bar_bull:
+                            reasons.append(f"R:R below required {float(sym_min_rr):.2f}x")
+                    
+                    reason_str = " | ".join(reasons) if reasons else "Conditions not met"
+                    rsi_str = f"{rsi_val:.1f}" if rsi_val is not None else "N/A"
+                    logger.info(f"  \\- {symbol}: No PDE signal (Zone: {zone_name}, Price: {live_bar['close']:.5f}, RSI: {rsi_str}, Candle: {candle_color}) -> Reason: [{reason_str}] - NO TRADE")
                     return
                 
                 # Check if we already traded this exact completed candle bar to prevent duplicates
