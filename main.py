@@ -588,7 +588,13 @@ class GoldTradingBot:
                           f"Profit: {profit_display}")
                 
                 # Check if we should exit based on market conditions (Exempt PDE strategy to let it reach structural zones)
-                is_pde = getattr(strategy, 'is_pde', False) or 'pde' in str(type(strategy)).lower() or str(trade_info.get('signal_type', '')).lower().startswith('pde')
+                is_pde = (
+                    getattr(config, 'STRATEGY_MODE', '').lower() == 'pde' or
+                    'pde' in str(trade_info.get('comment', '')).lower() or
+                    'pde' in str(trade_info.get('signal_type', '')).lower() or
+                    getattr(strategy, 'is_pde', False) or
+                    'pde' in str(type(strategy)).lower()
+                )
                 should_exit = False
                 if not is_pde:
                     should_exit = (
