@@ -742,12 +742,18 @@ class GoldTradingBot:
                     logger.warning(f"  \\- {symbol}: Insufficient historical data on {pde_tf} - SKIPPED")
                     return
                 
-                # Dynamically sync symbol-specific Min R:R Ratio from UI configuration
+                # Dynamically sync symbol-specific Min R:R Ratio & SL Buffer Multiplier from UI configuration
                 sym_min_rr = symbol_config.get('min_rr_ratio')
                 if sym_min_rr is None:
                     sym_min_rr = getattr(config, 'PDE_SETTINGS', {}).get('min_rr', 1.5)
+                
+                sym_sl_atr = symbol_config.get('sl_atr_mult')
+                if sym_sl_atr is None:
+                    sym_sl_atr = getattr(config, 'PDE_SETTINGS', {}).get('sl_atr_mult', 1.0)
+
                 if hasattr(strategy, 'pde_engine'):
                     strategy.pde_engine.min_rr = float(sym_min_rr)
+                    strategy.pde_engine.sl_atr_mult = float(sym_sl_atr)
 
                 # Generate PDE signals
                 df_pde = strategy.generate_signals(df_pde)

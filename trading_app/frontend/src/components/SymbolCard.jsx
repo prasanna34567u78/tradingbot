@@ -113,6 +113,21 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
               </div>
 
               <div>
+                <label className="block text-gray-400 mb-1">
+                  SL Buffer beyond Swing: <span className="text-white font-semibold">{data?.sl_atr_mult ?? 1.0}x ATR</span>
+                </label>
+                <input
+                  type="range"
+                  min="0.3"
+                  max="2.5"
+                  step="0.1"
+                  value={data?.sl_atr_mult ?? 1.0}
+                  onChange={(e) => onChange(`SYMBOLS.${symbol}.sl_atr_mult`, parseFloat(e.target.value))}
+                  className="w-full accent-accentRed"
+                />
+              </div>
+
+              <div>
                 <label className="block text-gray-400 mb-1">Max Simultaneous Trades</label>
                 <input
                   type="number"
