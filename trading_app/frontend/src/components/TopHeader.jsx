@@ -3,9 +3,9 @@ import { useAccountStore } from '../store/accountStore';
 import { useConfigStore } from '../store/configStore';
 import { startBot, stopBot, getBotStatus } from '../api/tradingApi';
 import { EditAccountModal } from './EditAccountModal';
-import { Play, Square, Bot, Cpu, Edit3, Settings } from 'lucide-react';
+import { Play, Square, Bot, Cpu, Edit3, Settings, Menu } from 'lucide-react';
 
-export const TopHeader = ({ onOpenGemini }) => {
+export const TopHeader = ({ onOpenGemini, onToggleMobileMenu }) => {
   const account = useAccountStore((state) => state.account);
   const botRunning = useAccountStore((state) => state.botRunning);
   const setBotRunning = useAccountStore((state) => state.setBotRunning);
@@ -93,21 +93,30 @@ export const TopHeader = ({ onOpenGemini }) => {
         </div>
       )}
 
-      <header className="h-16 bg-cardBg border-b border-borderColor px-6 flex items-center justify-between sticky top-0 z-30 shadow-md">
-        {/* Left: App Logo & Strategy Badge */}
-        <div className="flex items-center gap-4">
+      <header className="h-16 bg-cardBg border-b border-borderColor px-3 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-md">
+        {/* Left: Hamburger (Mobile) + App Logo & Strategy Badge */}
+        <div className="flex items-center gap-2 sm:gap-4">
+          {/* Mobile Hamburger Menu Button */}
+          <button
+            onClick={onToggleMobileMenu}
+            className="p-2 -ml-1 text-gray-400 hover:text-white hover:bg-borderColor rounded-lg md:hidden transition"
+            title="Open Navigation Menu"
+          >
+            <Menu size={22} />
+          </button>
+
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-accentGreen/10 rounded-lg text-accentGreen border border-accentGreen/20">
-              <Cpu size={22} />
+            <div className="p-1.5 sm:p-2 bg-accentGreen/10 rounded-lg text-accentGreen border border-accentGreen/20">
+              <Cpu size={18} className="sm:w-[22px] sm:h-[22px]" />
             </div>
             <div>
-              <h1 className="font-bold text-lg text-white leading-tight">TradeBot AI</h1>
-              <div className="text-[11px] text-gray-400 font-mono">Exness MT5 Engine</div>
+              <h1 className="font-bold text-sm sm:text-lg text-white leading-tight">TradeBot</h1>
+              <div className="text-[9px] sm:text-[11px] text-gray-400 font-mono hidden sm:block">Exness MT5 Engine</div>
             </div>
           </div>
 
           <span
-            className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider border ${
+            className={`hidden sm:inline-block px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold uppercase tracking-wider border ${
               strategyMode === 'mcp_enhanced'
                 ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
                 : strategyMode === 'scalping'

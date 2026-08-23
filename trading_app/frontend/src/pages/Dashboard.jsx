@@ -67,9 +67,9 @@ export const Dashboard = () => {
   const displayedFeed = filteredFeed.slice((feedPage - 1) * feedPageSize, feedPage * feedPageSize);
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-5 sm:space-y-6 pb-12">
       {/* Top 4 Metric Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <MetricCard
           title="Total Balance"
           value={`$${account.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
@@ -77,14 +77,14 @@ export const Dashboard = () => {
           icon={Wallet}
         />
         <MetricCard
-          title="Open Floating P&L"
+          title="Floating P&L"
           value={`${openPnl >= 0 ? '+' : ''}$${openPnl.toFixed(2)}`}
           indicator={openPnl >= 0 ? 'green' : 'red'}
-          subtext="Unrealized open positions profit"
+          subtext="Unrealized open positions"
           icon={TrendingUp}
         />
         <MetricCard
-          title="Active Trading Pairs"
+          title="Active Pairs"
           value={`${activeSymbolsCount} / ${Object.keys(symbols).length}`}
           subtext="Symbols enabled in config"
           icon={Cpu}
@@ -99,20 +99,20 @@ export const Dashboard = () => {
       </div>
 
       {/* Chart Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-10 gap-4 sm:gap-6">
         {/* Left Panel (60%) */}
         <div className="lg:col-span-6">
           <EquityChart />
         </div>
 
         {/* Right Panel (40%) */}
-        <div className="lg:col-span-4 bg-cardBg border border-borderColor p-5 rounded-2xl flex flex-col justify-between shadow-lg">
+        <div className="lg:col-span-4 bg-cardBg border border-borderColor p-4 sm:p-5 rounded-2xl flex flex-col justify-between shadow-lg">
           <div>
             <div className="flex items-center gap-2">
               <PieIcon size={18} className="text-accentBlue" />
               <h3 className="font-bold text-white text-sm">Trade Volume by Symbol</h3>
             </div>
-            <span className="text-xs text-gray-400">Distribution across active positions & history</span>
+            <span className="text-[11px] sm:text-xs text-gray-400">Distribution across active positions & history</span>
           </div>
 
           {!hasDonutData ? (
@@ -127,15 +127,15 @@ export const Dashboard = () => {
             </div>
           ) : (
             <>
-              <div className="w-full h-52 my-2">
+              <div className="w-full h-48 sm:h-52 my-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={donutData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
+                      innerRadius={45}
+                      outerRadius={75}
                       paddingAngle={5}
                       dataKey="value"
                     >
@@ -148,21 +148,21 @@ export const Dashboard = () => {
                     </Pie>
                     <Tooltip
                       contentStyle={{ backgroundColor: '#161b22', borderColor: '#30363d', borderRadius: '10px', color: '#e6edf3' }}
-                      formatter={(val, name) => [`${val} trades (${((val / totalVolume) * 100).toFixed(0)}%)`, name]}
+                      itemStyle={{ color: '#e6edf3', fontSize: '11px' }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {donutData.map((d, i) => (
-                  <div key={d.name} className="flex items-center gap-2 bg-darkBg/60 p-2 rounded-lg border border-borderColor/60">
+              <div className="grid grid-cols-2 gap-2 text-xs border-t border-borderColor/60 pt-3">
+                {donutData.map((d) => (
+                  <div key={d.name} className="flex items-center gap-1.5">
                     <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: SYMBOL_COLORS[d.name] || DEFAULT_COLORS[i % DEFAULT_COLORS.length] }}
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: SYMBOL_COLORS[d.name] || '#8b949e' }}
                     />
-                    <span className="text-gray-200 font-semibold">{d.name}</span>
-                    <span className="text-gray-500 font-mono ml-auto">{d.value} ({d.pct}%)</span>
+                    <span className="font-mono text-gray-300 text-[11px] truncate">{d.name}</span>
+                    <span className="text-gray-400 font-semibold text-[10px] ml-auto">{d.pct}%</span>
                   </div>
                 ))}
               </div>
@@ -178,7 +178,7 @@ export const Dashboard = () => {
           <h3 className="font-bold text-white text-sm">Active Symbol Quick Controls</h3>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {Object.entries(symbols).map(([sym, data]) => (
             <div key={sym} className={`bg-cardBg border p-4 rounded-xl flex flex-col justify-between transition ${data.enabled ? 'border-borderColor shadow-md' : 'border-borderColor/40 opacity-70'}`}>
               <div className="flex items-center justify-between">
