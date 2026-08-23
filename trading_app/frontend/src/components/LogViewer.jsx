@@ -142,8 +142,8 @@ export const LogViewer = () => {
   return (
     <div className="bg-cardBg border border-borderColor rounded-2xl overflow-hidden flex flex-col h-[700px] shadow-2xl">
       {/* 4 Tabs Header */}
-      <div className="bg-darkBg/80 border-b border-borderColor flex items-center justify-between px-4 pt-3 backdrop-blur">
-        <div className="flex gap-2">
+      <div className="bg-darkBg/80 border-b border-borderColor flex items-center justify-between px-3 sm:px-4 pt-2 sm:pt-3 backdrop-blur gap-2">
+        <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-1">
           {[
             { id: 'bot_logs', label: 'Bot Logs', icon: Terminal, count: filteredLogs.length },
             { id: 'trade_events', label: 'Trade Events', icon: Zap, count: filteredEvents.length },
@@ -156,16 +156,16 @@ export const LogViewer = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-xl border-t border-x transition ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-[11px] sm:text-xs font-bold rounded-t-xl border-t border-x whitespace-nowrap transition shrink-0 ${
                   isActive
                     ? 'bg-cardBg text-white border-borderColor border-b-transparent shadow-lg'
                     : 'text-gray-400 border-transparent hover:text-white'
                 }`}
               >
-                <Icon size={15} className={isActive ? 'text-accentBlue' : 'text-gray-500'} />
+                <Icon size={14} className={isActive ? 'text-accentBlue' : 'text-gray-500'} />
                 {tab.label}
                 {tab.count !== undefined && (
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${isActive ? 'bg-accentBlue/20 text-accentBlue' : 'bg-gray-800 text-gray-400'}`}>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] ${isActive ? 'bg-accentBlue/20 text-accentBlue' : 'bg-gray-800 text-gray-400'}`}>
                     {tab.count}
                   </span>
                 )}
@@ -174,7 +174,7 @@ export const LogViewer = () => {
           })}
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-400">
+        <div className="flex items-center gap-1.5 text-xs text-gray-400 shrink-0 hidden sm:flex">
           <span className="h-2.5 w-2.5 rounded-full bg-accentGreen animate-pulse shadow-[0_0_8px_#00d395]" />
           <span className="font-mono text-gray-300 font-semibold text-[11px]">Real-Time WS Streaming</span>
         </div>
@@ -306,15 +306,36 @@ export const LogViewer = () => {
                       ? (logPage - 1) * Number(pageSize) + i + 1
                       : filteredLogs.length - ((logPage - 1) * Number(pageSize) + i));
                 return (
-                  <div key={i} className="leading-relaxed hover:bg-gray-800/50 px-2 py-1 rounded transition flex items-start gap-2 border-b border-gray-800/30">
-                    <span className="text-gray-600 select-none text-[10px] w-8 text-right font-mono">
-                      {String(rowNum).padStart(3, '0')}
-                    </span>
-                    <span className="text-gray-500 shrink-0 font-mono text-[11px]">[{log.timestamp}]</span>
-                    <span className={`font-bold shrink-0 text-[10px] px-1.5 py-0.2 rounded border ${getLevelColor(log.level)}`}>
-                      {log.level}
-                    </span>
-                    <span className="text-gray-200 break-all">{log.message}</span>
+                  <div key={i} className="hover:bg-gray-800/50 p-2 sm:px-2.5 sm:py-1 rounded transition border-b border-gray-800/30 text-xs">
+                    {/* Mobile Meta Header (sm:hidden) */}
+                    <div className="flex sm:hidden items-center justify-between gap-1.5 mb-1 text-[10px]">
+                      <div className="flex items-center gap-1.5 font-mono">
+                        <span className="text-gray-600">#{String(rowNum).padStart(3, '0')}</span>
+                        <span className="text-gray-400">[{log.timestamp}]</span>
+                      </div>
+                      <span className={`font-bold text-[9px] px-1.5 py-0.2 rounded border ${getLevelColor(log.level)}`}>
+                        {log.level}
+                      </span>
+                    </div>
+
+                    {/* Content Row */}
+                    <div className="flex items-start gap-2">
+                      {/* Desktop-only meta fields */}
+                      <span className="hidden sm:inline-block text-gray-600 select-none text-[10px] w-8 text-right font-mono shrink-0">
+                        {String(rowNum).padStart(3, '0')}
+                      </span>
+                      <span className="hidden sm:inline-block text-gray-400 shrink-0 font-mono text-[11px]">
+                        [{log.timestamp}]
+                      </span>
+                      <span className={`hidden sm:inline-block font-bold shrink-0 text-[10px] px-1.5 py-0.2 rounded border ${getLevelColor(log.level)}`}>
+                        {log.level}
+                      </span>
+
+                      {/* Log Message with proper breaking and readable font */}
+                      <span className="text-gray-200 break-words flex-1 text-[11px] sm:text-xs leading-relaxed font-mono">
+                        {log.message}
+                      </span>
+                    </div>
                   </div>
                 );
               })
@@ -323,40 +344,40 @@ export const LogViewer = () => {
 
           {/* Pagination Bar for Terminal Logs */}
           {pageSize !== 'ALL' && filteredLogs.length > 0 && (
-            <div className="bg-darkBg/90 border-t border-borderColor px-4 py-2 flex items-center justify-between text-xs font-mono">
-              <span className="text-gray-400 text-[11px]">
-                Showing <strong className="text-white">{(logPage - 1) * Number(pageSize) + 1}</strong> to{' '}
+            <div className="bg-darkBg/90 border-t border-borderColor px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+              <span className="text-gray-400 text-[10px] sm:text-[11px]">
+                Showing <strong className="text-white">{(logPage - 1) * Number(pageSize) + 1}</strong>-
                 <strong className="text-white">{Math.min(logPage * Number(pageSize), filteredLogs.length)}</strong> of{' '}
-                <strong className="text-white">{filteredLogs.length}</strong> logs
+                <strong className="text-white">{filteredLogs.length}</strong>
               </span>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1 sm:gap-1.5">
                 <button
                   onClick={() => setLogPage(1)}
                   disabled={logPage === 1}
                   className="p-1 bg-cardBg border border-borderColor rounded text-gray-300 disabled:opacity-30 hover:text-white"
                   title="First Page"
                 >
-                  <ChevronsLeft size={14} />
+                  <ChevronsLeft size={13} />
                 </button>
                 <button
                   onClick={() => setLogPage((p) => Math.max(1, p - 1))}
                   disabled={logPage === 1}
-                  className="px-2.5 py-1 bg-cardBg border border-borderColor rounded text-gray-300 disabled:opacity-30 hover:text-white flex items-center gap-1"
+                  className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-cardBg border border-borderColor rounded text-gray-300 disabled:opacity-30 hover:text-white flex items-center gap-1 text-[11px]"
                 >
-                  <ChevronLeft size={14} /> Prev
+                  <ChevronLeft size={13} /> Prev
                 </button>
                 
-                <span className="px-2.5 py-1 bg-accentBlue/20 text-accentBlue border border-accentBlue/40 rounded font-bold">
-                  Page {logPage} of {totalLogPages}
+                <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-accentBlue/20 text-accentBlue border border-accentBlue/40 rounded font-bold text-[10px] sm:text-xs">
+                  {logPage} / {totalLogPages}
                 </span>
 
                 <button
                   onClick={() => setLogPage((p) => Math.min(totalLogPages, p + 1))}
                   disabled={logPage >= totalLogPages}
-                  className="px-2.5 py-1 bg-cardBg border border-borderColor rounded text-gray-300 disabled:opacity-30 hover:text-white flex items-center gap-1"
+                  className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-cardBg border border-borderColor rounded text-gray-300 disabled:opacity-30 hover:text-white flex items-center gap-1 text-[11px]"
                 >
-                  Next <ChevronRight size={14} />
+                  Next <ChevronRight size={13} />
                 </button>
                 <button
                   onClick={() => setLogPage(totalLogPages)}
@@ -364,7 +385,7 @@ export const LogViewer = () => {
                   className="p-1 bg-cardBg border border-borderColor rounded text-gray-300 disabled:opacity-30 hover:text-white"
                   title="Last Page"
                 >
-                  <ChevronsRight size={14} />
+                  <ChevronsRight size={13} />
                 </button>
               </div>
             </div>
