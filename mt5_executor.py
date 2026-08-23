@@ -428,12 +428,16 @@ class MT5Executor:
         """
         # Detect installed MT5 terminal paths
         mt5_paths = [
+            os.environ.get("MT5_PATH", ""),
+            getattr(config, "MT5_PATH", ""),
             r"C:\Program Files\MetaTrader 5\terminal64.exe",
+            r"C:\Program Files\Exness MetaTrader 5\terminal64.exe",
             r"C:\Program Files (x86)\MetaTrader 5\terminal64.exe",
+            r"C:\Program Files (x86)\Exness MetaTrader 5\terminal64.exe",
         ]
         mt5_path = None
         for p in mt5_paths:
-            if os.path.exists(p):
+            if p and os.path.exists(p):
                 mt5_path = p
                 break
 
