@@ -20,7 +20,10 @@ export const useWebSocket = () => {
     let reconnectTimer = null;
 
     const connect = () => {
-      ws = new WebSocket('ws://localhost:8000/ws');
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = window.location.hostname || '127.0.0.1';
+      const wsPort = window.location.port ? `:${window.location.port}` : ':8000';
+      ws = new WebSocket(`${wsProtocol}//${wsHost}${wsPort}/ws`);
 
       ws.onopen = () => {
         setWsConnected(true);
