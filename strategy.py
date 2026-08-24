@@ -473,6 +473,8 @@ class SMCStrategy:
             trail_step = float(trailing_config.get('trail_step', 0.3))
             trail_sl = bool(trailing_config.get('trail_sl', True))
             trail_tp = bool(trailing_config.get('trail_tp', True))
+            enable_breakeven = bool(trailing_config.get('enable_breakeven', True))
+            enable_partial_booking = bool(trailing_config.get('enable_partial_booking', True))
             partial_close_pct = float(trailing_config.get('partial_close_pct', 50.0))
             
             result = {
@@ -482,9 +484,8 @@ class SMCStrategy:
                 'partial_close_pct': partial_close_pct
             }
             
-            # 1. Breakeven & Dynamic Partial Booking Logic
-            # Triggers when price reaches breakeven_ratio of Take Profit (e.g. 50% TP distance)
-            if not self.breakeven_activated and profit_tp_pct >= breakeven_ratio:
+            # 1. Breakeven Logic (Controlled by enable_breakeven toggle)
+            if enable_breakeven and not self.breakeven_activated and profit_tp_pct >= breakeven_ratio:
                 be_buffer = self._get_breakeven_buffer(symbol, atr)
                 be_stop = entry_price + be_buffer if side == 'buy' else entry_price - be_buffer
                 
@@ -494,17 +495,15 @@ class SMCStrategy:
                     result['stop_loss'] = be_stop
                     self.breakeven_activated = True
                     self.last_trail_price = be_stop
-                    
-                    # Trigger dynamic partial booking if configured and not yet executed
-                    if not getattr(self, 'partial_booked', False) and partial_close_pct > 0:
-                        result['partial_close'] = True
-                        self.partial_booked = True
-                        logger.info(f"[{symbol}] 🎯 Breakeven & Partial Booking Triggered ({profit_tp_pct*100:.1f}% of TP). "
-                                    f"Booking {partial_close_pct}% lot, moving SL to Breakeven (+{be_buffer:.4f} buffer): {be_stop:.5f}")
-                    else:
-                        logger.info(f"[{symbol}] Moving SL to Breakeven at {be_stop:.5f} (Profit: {profit_tp_pct*100:.1f}% of TP, {profit_r:.2f}R)")
+                    logger.info(f"[{symbol}] Moving SL to Breakeven at {be_stop:.5f} (+{be_buffer:.4f} buffer, Profit: {profit_tp_pct*100:.1f}% of TP, {profit_r:.2f}R)")
+
+            # 2. Dynamic Partial Booking Logic (Controlled by enable_partial_booking toggle)
+            if enable_partial_booking and not getattr(self, 'partial_booked', False) and profit_tp_pct >= breakeven_ratio and partial_close_pct > 0:
+                result['partial_close'] = True
+                self.partial_booked = True
+                logger.info(f"[{symbol}] 🎯 Dynamic Partial Booking Triggered ({profit_tp_pct*100:.1f}% of TP). Booking {partial_close_pct}% lot.")
             
-            # 2. Trailing Stop Loss Logic (Controlled by trail_sl checkbox & start_ratio)
+            # 3. Trailing Stop Loss Logic (Controlled by trail_sl checkbox & start_ratio)
             if trail_sl and profit_tp_pct >= start_ratio:
                 self.trailing_activated = True
                 new_stop = self._calculate_trailing_stop(df, current_price, current_stop, atr, side)

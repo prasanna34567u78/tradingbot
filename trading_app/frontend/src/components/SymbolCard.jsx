@@ -222,24 +222,42 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
                   />
                 </div>
               </div>
-              <div className="flex gap-4 mt-2">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3">
+                <label className="flex items-center gap-2 cursor-pointer bg-darkBg/60 p-2 rounded-lg border border-borderColor/50 hover:border-borderColor transition">
                   <input
                     type="checkbox"
                     checked={data.trailing_settings.trail_tp ?? true}
                     onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.trail_tp`, e.target.checked)}
                     className="rounded bg-darkBg border-borderColor text-amber-400"
                   />
-                  <span>Trail Take Profit</span>
+                  <span className="text-xs font-medium text-gray-300">Trail Take Profit</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer bg-darkBg/60 p-2 rounded-lg border border-borderColor/50 hover:border-borderColor transition">
                   <input
                     type="checkbox"
                     checked={data.trailing_settings.trail_sl ?? true}
                     onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.trail_sl`, e.target.checked)}
                     className="rounded bg-darkBg border-borderColor text-amber-400"
                   />
-                  <span>Trail Stop Loss</span>
+                  <span className="text-xs font-medium text-gray-300">Trail Stop Loss</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer bg-darkBg/60 p-2 rounded-lg border border-borderColor/50 hover:border-borderColor transition">
+                  <input
+                    type="checkbox"
+                    checked={data.trailing_settings.enable_breakeven ?? true}
+                    onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.enable_breakeven`, e.target.checked)}
+                    className="rounded bg-darkBg border-borderColor text-accentBlue"
+                  />
+                  <span className="text-xs font-medium text-gray-300">Auto Breakeven (BE)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer bg-darkBg/60 p-2 rounded-lg border border-borderColor/50 hover:border-borderColor transition">
+                  <input
+                    type="checkbox"
+                    checked={data.trailing_settings.enable_partial_booking ?? true}
+                    onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.enable_partial_booking`, e.target.checked)}
+                    className="rounded bg-darkBg border-borderColor text-emerald-400"
+                  />
+                  <span className="text-xs font-medium text-gray-300">Partial Book ({data.trailing_settings.partial_close_pct ?? 50}%)</span>
                 </label>
               </div>
             </div>
