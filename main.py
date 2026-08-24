@@ -12,6 +12,7 @@ from datetime import datetime
 # Add error handling for optional imports
 try:
     from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.cron import CronTrigger
 except ImportError:
     logging.error("apscheduler not installed. Install with: pip install apscheduler")
     sys.exit(1)
@@ -1179,29 +1180,53 @@ class GoldTradingBot:
                 )
     
             
-            # Schedule scalping tasks with high-frequency intervals
+            # Schedule scalping tasks with clock-aligned cron intervals (:00 and :30 on the second)
             intervals = config.SCHEDULER_INTERVALS
+            sig_interval = intervals.get('signal_check', 30)
             
-            # Check signals for all symbols (much more frequent for scalping)
-            self.scheduler.add_job(self.check_for_signals, 'interval', 
-                                 seconds=intervals.get('signal_check', 60),  # Every 10 seconds for scalping
-                                 name='scalping_signal_check')
+            # Check signals exactly on clock boundaries (e.g. :00 and :30)
+            if sig_interval == 30:
+                sig_trigger = CronTrigger(second='0,30')
+            elif sig_interval == 10:
+                sig_trigger = CronTrigger(second='0,10,20,30,40,50')
+            elif sig_interval == 60:
+                sig_trigger = CronTrigger(second='0')
+            else:
+                sig_trigger = 'interval'
             
-            # Monitor active trades with aggressive trailing (very frequent)
-            self.scheduler.add_job(self.update_open_trades, 'interval', 
-                                 seconds=intervals.get('trade_monitor', 30),  # Every 3 seconds for scalping
-                                 name='scalping_trade_monitor')
+            if isinstance(sig_trigger, CronTrigger):
+                self.scheduler.add_job(self.check_for_signals, sig_trigger,
+                                     name='scalping_signal_check',
+                                     max_instances=2,
+                                     coalesce=True)
+            else:
+                self.scheduler.add_job(self.check_for_signals, 'interval',
+                                     seconds=sig_interval,
+                                     name='scalping_signal_check',
+                                     max_instances=2,
+                                     coalesce=True)
             
-            # Update correlations periodically
+            # Monitor active trades on exact 10-second boundaries (:00, :10, :20, :30, :40, :50)
+            self.scheduler.add_job(self.update_open_trades, 
+                                 CronTrigger(second='0,10,20,30,40,50'),
+                                 name='scalping_trade_monitor',
+                                 max_instances=2,
+                                 coalesce=True)
+            
+            # Update correlations periodically (every 5 minutes on the minute)
             if len(self.active_symbols) > 1:
-                self.scheduler.add_job(self.update_correlations, 'interval', 
-                                     seconds=intervals.get('correlation_update', 300), 
-                                     name='correlation_update')
+                self.scheduler.add_job(self.update_correlations, 
+                                     CronTrigger(minute='*/5', second='0'),
+                                     name='correlation_update',
+                                     max_instances=1,
+                                     coalesce=True)
             
-            # Risk assessment
-            self.scheduler.add_job(self.check_global_risk_limits, 'interval', 
-                                 seconds=intervals.get('risk_check', 120), 
-                                 name='risk_check')
+            # Risk assessment on the minute (:00)
+            self.scheduler.add_job(self.check_global_risk_limits, 
+                                 CronTrigger(second='0'),
+                                 name='risk_check',
+                                 max_instances=1,
+                                 coalesce=True)
             
             # Start scheduler
             self.scheduler.start()
