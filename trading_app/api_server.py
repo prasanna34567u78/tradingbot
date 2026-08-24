@@ -1057,6 +1057,7 @@ async def start_bot():
             sym_cfg = symbols_cfg.get(sym, {})
             lot_display = sym_cfg.get('fixed_lot_size') or sym_cfg.get('lot_size') or 'Dynamic (Risk %)'
             tp_ratio = sym_cfg.get('tp_ratio', 2.0)
+            risk_pct = sym_cfg.get('risk_percent', 1.0)
             trailing = sym_cfg.get('trailing_settings', {})
             enable_be = trailing.get('enable_breakeven', True)
             enable_pb = trailing.get('enable_partial_booking', True)
