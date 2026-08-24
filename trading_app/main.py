@@ -1180,46 +1180,66 @@ class GoldTradingBot:
                 )
     
             
-            # Schedule scalping tasks with clock-aligned cron intervals (:00 and :30 on the second)
+            # Schedule scalping tasks with clock-aligned cron intervals
             intervals = config.SCHEDULER_INTERVALS
-            sig_interval = intervals.get('signal_check', 30)
             
-            # Check signals exactly on clock boundaries (e.g. :00 and :30)
-            if sig_interval == 30:
-                sig_trigger = CronTrigger(second='0,30')
-            elif sig_interval == 10:
-                sig_trigger = CronTrigger(second='0,10,20,30,40,50')
-            elif sig_interval == 60:
-                sig_trigger = CronTrigger(second='0')
-            else:
-                sig_trigger = 'interval'
-            
-            if isinstance(sig_trigger, CronTrigger):
-                self.scheduler.add_job(self.check_for_signals, sig_trigger,
+            def _build_clock_trigger(seconds_interval):
+                sec = max(1, int(seconds_interval))
+                if 60 % sec == 0 and sec < 60:
+                    return CronTrigger(second=f'*/{sec}')
+                elif sec == 60:
+                    return CronTrigger(second='0')
+                elif sec > 60 and sec % 60 == 0:
+                    mins = sec // 60
+                    return CronTrigger(minute=f'*/{mins}', second='0')
+                else:
+                    return 'interval'
+
+            # 1. Signal Check Trigger (e.g. every 30s or custom interval)
+            sig_sec = intervals.get('signal_check', 30)
+            sig_trig = _build_clock_trigger(sig_sec)
+            if isinstance(sig_trig, CronTrigger):
+                self.scheduler.add_job(self.check_for_signals, sig_trig,
                                      name='scalping_signal_check',
                                      max_instances=2,
                                      coalesce=True)
             else:
                 self.scheduler.add_job(self.check_for_signals, 'interval',
-                                     seconds=sig_interval,
+                                     seconds=sig_sec,
                                      name='scalping_signal_check',
                                      max_instances=2,
                                      coalesce=True)
             
-            # Monitor active trades on exact 10-second boundaries (:00, :10, :20, :30, :40, :50)
-            self.scheduler.add_job(self.update_open_trades, 
-                                 CronTrigger(second='0,10,20,30,40,50'),
-                                 name='scalping_trade_monitor',
-                                 max_instances=2,
-                                 coalesce=True)
-            
-            # Update correlations periodically (every 5 minutes on the minute)
-            if len(self.active_symbols) > 1:
-                self.scheduler.add_job(self.update_correlations, 
-                                     CronTrigger(minute='*/5', second='0'),
-                                     name='correlation_update',
-                                     max_instances=1,
+            # 2. Trade Monitor Trigger (e.g. every 5s, 10s, or custom interval)
+            mon_sec = intervals.get('trade_monitor', 10)
+            mon_trig = _build_clock_trigger(mon_sec)
+            if isinstance(mon_trig, CronTrigger):
+                self.scheduler.add_job(self.update_open_trades, mon_trig,
+                                     name='scalping_trade_monitor',
+                                     max_instances=2,
                                      coalesce=True)
+            else:
+                self.scheduler.add_job(self.update_open_trades, 'interval',
+                                     seconds=mon_sec,
+                                     name='scalping_trade_monitor',
+                                     max_instances=2,
+                                     coalesce=True)
+            
+            # 3. Update correlations periodically (every 5 minutes on the minute)
+            if len(self.active_symbols) > 1:
+                corr_sec = intervals.get('correlation_update', 300)
+                corr_trig = _build_clock_trigger(corr_sec)
+                if isinstance(corr_trig, CronTrigger):
+                    self.scheduler.add_job(self.update_correlations, corr_trig,
+                                         name='correlation_update',
+                                         max_instances=1,
+                                         coalesce=True)
+                else:
+                    self.scheduler.add_job(self.update_correlations, 'interval',
+                                         seconds=corr_sec,
+                                         name='correlation_update',
+                                         max_instances=1,
+                                         coalesce=True)
             
             # Risk assessment on the minute (:00)
             self.scheduler.add_job(self.check_global_risk_limits, 
