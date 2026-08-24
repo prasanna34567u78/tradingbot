@@ -1,8 +1,13 @@
 import axios from 'axios';
 
 const getBaseURL = () => {
-  if (typeof window !== 'undefined' && window.location.hostname) {
-    return `http://${window.location.hostname}:8000`;
+  if (typeof window !== 'undefined') {
+    // If running in Vite development server (port 5173), proxy to FastAPI backend
+    if (window.location.port === '5173') {
+      return `http://${window.location.hostname}:8000`;
+    }
+    // In production (domain HTTPS, IP port 8000, or localhost), use same origin
+    return window.location.origin;
   }
   return 'http://127.0.0.1:8000';
 };

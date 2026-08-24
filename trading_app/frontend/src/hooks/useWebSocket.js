@@ -22,7 +22,12 @@ export const useWebSocket = () => {
     const connect = () => {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsHost = window.location.hostname || '127.0.0.1';
-      const wsPort = window.location.port ? `:${window.location.port}` : ':8000';
+      let wsPort = '';
+      if (window.location.port === '5173') {
+        wsPort = ':8000';
+      } else if (window.location.port) {
+        wsPort = `:${window.location.port}`;
+      }
       ws = new WebSocket(`${wsProtocol}//${wsHost}${wsPort}/ws`);
 
       ws.onopen = () => {
