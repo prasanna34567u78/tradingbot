@@ -18,27 +18,22 @@ const SYMBOL_COLORS = {
 
 const DEFAULT_COLORS = ['#d29922', '#f78166', '#58a6ff', '#00d395', '#a371f7'];
 
+const EMPTY_OBJ = {};
+const EMPTY_ARR = [];
+
 export const Dashboard = () => {
   const account = useAccountStore((state) => state.account);
-  const positions = usePositionsStore((state) => state.positions) || [];
-  const fetchPositions = usePositionsStore((state) => state.fetchPositions);
-  const symbols = useConfigStore((state) => state.config?.SYMBOLS || {});
-  const updateField = useConfigStore((state) => state.updateField);
-  const fetchConfig = useConfigStore((state) => state.fetchConfig);
-  const symbolDistribution = useAnalyticsStore((state) => state.symbolDistribution) || {};
-  const activityFeed = useAnalyticsStore((state) => state.activityFeed) || [];
-  const fetchAnalytics = useAnalyticsStore((state) => state.fetchAnalytics);
+  const positions = usePositionsStore((state) => state.positions) || EMPTY_ARR;
+  const config = useConfigStore((state) => state.config);
+  const symbolDistribution = useAnalyticsStore((state) => state.symbolDistribution) || EMPTY_OBJ;
+  const activityFeed = useAnalyticsStore((state) => state.activityFeed) || EMPTY_ARR;
+
+  const symbols = config?.SYMBOLS || EMPTY_OBJ;
 
   const [feedFilter, setFeedFilter] = useState('ALL');
   const [feedSearch, setFeedSearch] = useState('');
   const [feedPage, setFeedPage] = useState(1);
   const [feedPageSize, setFeedPageSize] = useState(5);
-
-  useEffect(() => {
-    fetchConfig();
-    fetchPositions();
-    fetchAnalytics();
-  }, []);
 
   const openPnl = (Array.isArray(positions) ? positions : []).reduce((sum, pos) => sum + (pos?.profit || 0), 0);
   const activeSymbolsCount = Object.values(symbols).filter((s) => s.enabled).length;
