@@ -3,6 +3,7 @@ import { useAccountStore } from '../store/accountStore';
 import { useConfigStore } from '../store/configStore';
 import { startBot, stopBot, getBotStatus } from '../api/tradingApi';
 import { EditAccountModal } from './EditAccountModal';
+import { formatCurrency } from '../utils/formatters';
 import { Play, Square, Bot, Cpu, Edit3, Settings, Menu } from 'lucide-react';
 
 export const TopHeader = ({ onOpenGemini, onToggleMobileMenu }) => {
@@ -17,6 +18,7 @@ export const TopHeader = ({ onOpenGemini, onToggleMobileMenu }) => {
   const [toast, setToast] = useState(null);
 
   const strategyMode = config?.STRATEGY_MODE || 'mcp_enhanced';
+  const currency = account?.currency || 'USD';
 
   // Sync bot status from backend on mount (before WebSocket kicks in)
   useEffect(() => {
@@ -31,9 +33,6 @@ export const TopHeader = ({ onOpenGemini, onToggleMobileMenu }) => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
-
-  const formatCurrency = (val) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val || 0);
 
   const handleToggleBot = async () => {
     setLoading(true);
@@ -132,17 +131,17 @@ export const TopHeader = ({ onOpenGemini, onToggleMobileMenu }) => {
         <div className="hidden md:flex items-center gap-5 bg-darkBg/60 px-5 py-1.5 rounded-xl border border-borderColor/60 text-xs">
           <div>
             <span className="text-gray-400 block text-[10px] uppercase">Balance</span>
-            <span className="font-bold text-white">{formatCurrency(account.balance)}</span>
+            <span className="font-bold text-white">{formatCurrency(account.balance, currency)}</span>
           </div>
           <div className="h-6 w-px bg-borderColor" />
           <div>
             <span className="text-gray-400 block text-[10px] uppercase">Equity</span>
-            <span className="font-bold text-white">{formatCurrency(account.equity)}</span>
+            <span className="font-bold text-white">{formatCurrency(account.equity, currency)}</span>
           </div>
           <div className="h-6 w-px bg-borderColor" />
           <div>
             <span className="text-gray-400 block text-[10px] uppercase">Free Margin</span>
-            <span className="font-semibold text-gray-300">{formatCurrency(account.free_margin)}</span>
+            <span className="font-semibold text-gray-300">{formatCurrency(account.free_margin, currency)}</span>
           </div>
           <div className="h-6 w-px bg-borderColor" />
           <div>
@@ -151,8 +150,8 @@ export const TopHeader = ({ onOpenGemini, onToggleMobileMenu }) => {
               className={`font-semibold ${account.daily_pnl >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}
             >
               {account.daily_pnl >= 0
-                ? `+${formatCurrency(account.daily_pnl)}`
-                : formatCurrency(account.daily_pnl)}
+                ? `+${formatCurrency(account.daily_pnl, currency)}`
+                : formatCurrency(account.daily_pnl, currency)}
             </span>
           </div>
 

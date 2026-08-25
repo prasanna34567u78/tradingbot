@@ -1,5 +1,7 @@
 import React from 'react';
 import { usePositionsStore } from '../store/positionsStore';
+import { useAccountStore } from '../store/accountStore';
+import { formatCurrency } from '../utils/formatters';
 import { Edit2, XCircle, TrendingUp, Shield, Zap } from 'lucide-react';
 
 export const TradeTable = ({ onOpenManualTrade }) => {
@@ -7,6 +9,7 @@ export const TradeTable = ({ onOpenManualTrade }) => {
   const closeTrade = usePositionsStore((state) => state.closeTrade);
   const partialCloseTrade = usePositionsStore((state) => state.partialCloseTrade);
   const setSelectedPosition = usePositionsStore((state) => state.setSelectedPosition);
+  const currency = useAccountStore((state) => state.account?.currency || 'USD');
 
   return (
     <div className="bg-cardBg border border-borderColor rounded-xl overflow-hidden flex flex-col h-full">
@@ -55,7 +58,7 @@ export const TradeTable = ({ onOpenManualTrade }) => {
                   </div>
 
                   <div className={`text-sm font-bold font-mono ${isProfitable ? 'text-accentGreen' : 'text-accentRed'}`}>
-                    {isProfitable ? `+$${pos.profit.toFixed(2)}` : `-$${Math.abs(pos.profit).toFixed(2)}`}
+                    {isProfitable ? `+${formatCurrency(pos.profit, currency)}` : formatCurrency(pos.profit, currency)}
                   </div>
                 </div>
 
@@ -154,7 +157,7 @@ export const TradeTable = ({ onOpenManualTrade }) => {
                   <td className="p-3 font-mono text-gray-400">{pos.sl || 'None'}</td>
                   <td className="p-3 font-mono text-gray-400">{pos.tp || 'None'}</td>
                   <td className={`p-3 font-bold font-mono ${pos.profit >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
-                    {pos.profit >= 0 ? `+$${pos.profit.toFixed(2)}` : `-$${Math.abs(pos.profit).toFixed(2)}`}
+                    {pos.profit >= 0 ? `+${formatCurrency(pos.profit, currency)}` : formatCurrency(pos.profit, currency)}
                   </td>
                   <td className="p-3 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <button

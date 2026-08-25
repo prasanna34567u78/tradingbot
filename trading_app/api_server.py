@@ -340,6 +340,7 @@ def fetch_account_data() -> Dict[str, Any]:
                         "free_margin": round(info.margin_free, 2),
                         "profit": round(info.profit, 2),
                         "daily_pnl": round(daily_pnl, 2),
+                        "currency": str(getattr(info, "currency", "INR") or "INR"),
                         "override_enabled": 0
                     }
                     cursor.execute("""
@@ -363,12 +364,13 @@ def fetch_account_data() -> Dict[str, Any]:
             "free_margin": row[3],
             "profit": row[4],
             "daily_pnl": row[5],
-            "override_enabled": row[6]
+            "override_enabled": row[6],
+            "currency": "INR"
         }
         _CACHE["account"] = (now, res)
         return res
 
-    fallback = {"balance": 2000.00, "equity": 2000.00, "margin": 0.00, "free_margin": 2000.00, "profit": 0.00, "daily_pnl": 0.00, "override_enabled": 0}
+    fallback = {"balance": 2000.00, "equity": 2000.00, "margin": 0.00, "free_margin": 2000.00, "profit": 0.00, "daily_pnl": 0.00, "override_enabled": 0, "currency": "INR"}
     _CACHE["account"] = (now, fallback)
     return fallback
 

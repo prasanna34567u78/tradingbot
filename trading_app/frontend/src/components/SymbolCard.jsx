@@ -167,14 +167,20 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
           </div>
 
           {/* Trailing Settings */}
+          {/* Trailing & Order Management */}
           {data?.trailing_settings && (
-            <div>
-              <h4 className="font-semibold text-gray-300 mb-3 flex items-center gap-1.5">
-                <Sliders size={14} className="text-amber-400" /> Trailing & Partial Booking Settings
+            <div className="space-y-4 pt-1">
+              <h4 className="font-semibold text-gray-200 flex items-center gap-1.5 border-b border-borderColor/50 pb-2">
+                <Sliders size={14} className="text-amber-400" /> Trailing & Profit Booking Strategy
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+
+              {/* Sliders Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-darkBg/60 p-3.5 rounded-xl border border-borderColor/60">
                 <div>
-                  <label className="block text-gray-400 mb-1">Start Trailing (% of TP): {data.trailing_settings.start_ratio ?? 0.8}</label>
+                  <div className="flex justify-between text-gray-300 mb-1">
+                    <span>Start Trail (% of TP):</span>
+                    <span className="font-bold text-amber-400">{data.trailing_settings.start_ratio ?? 0.8}x</span>
+                  </div>
                   <input
                     type="range"
                     min="0.0"
@@ -186,7 +192,10 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-400 mb-1">Trail Step: {data.trailing_settings.trail_step ?? 0.3}</label>
+                  <div className="flex justify-between text-gray-300 mb-1">
+                    <span>Trail Step (ATR):</span>
+                    <span className="font-bold text-amber-400">{data.trailing_settings.trail_step ?? 0.3}x</span>
+                  </div>
                   <input
                     type="range"
                     min="0.05"
@@ -198,7 +207,10 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-400 mb-1">Breakeven Ratio: {data.trailing_settings.breakeven_ratio ?? 0.5}</label>
+                  <div className="flex justify-between text-gray-300 mb-1">
+                    <span>Target / BE Ratio:</span>
+                    <span className="font-bold text-accentBlue">{data.trailing_settings.breakeven_ratio ?? 0.5}x</span>
+                  </div>
                   <input
                     type="range"
                     min="0.1"
@@ -206,11 +218,14 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
                     step="0.05"
                     value={data.trailing_settings.breakeven_ratio ?? 0.5}
                     onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.breakeven_ratio`, parseFloat(e.target.value))}
-                    className="w-full accent-amber-400"
+                    className="w-full accent-accentBlue"
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-400 mb-1">Partial Book (% of Lot): {data.trailing_settings.partial_close_pct ?? 50}%</label>
+                  <div className="flex justify-between text-gray-300 mb-1">
+                    <span>Partial Close Lot:</span>
+                    <span className="font-bold text-emerald-400">{data.trailing_settings.partial_close_pct ?? 50}%</span>
+                  </div>
                   <input
                     type="range"
                     min="10"
@@ -222,61 +237,80 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-3">
-                <label className="flex items-center gap-2 cursor-pointer bg-darkBg/60 p-2 rounded-lg border border-borderColor/50 hover:border-borderColor transition">
-                  <input
-                    type="checkbox"
-                    checked={data.trailing_settings.trail_tp ?? true}
-                    onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.trail_tp`, e.target.checked)}
-                    className="rounded bg-darkBg border-borderColor text-amber-400"
-                  />
-                  <span className="text-xs font-medium text-gray-300">Trail Take Profit</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer bg-darkBg/60 p-2 rounded-lg border border-borderColor/50 hover:border-borderColor transition">
-                  <input
-                    type="checkbox"
-                    checked={data.trailing_settings.trail_sl ?? true}
-                    onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.trail_sl`, e.target.checked)}
-                    className="rounded bg-darkBg border-borderColor text-amber-400"
-                  />
-                  <span className="text-xs font-medium text-gray-300">Trail Stop Loss</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer bg-darkBg/60 p-2 rounded-lg border border-borderColor/50 hover:border-borderColor transition">
-                  <input
-                    type="checkbox"
-                    checked={data.trailing_settings.enable_breakeven ?? true}
-                    onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.enable_breakeven`, e.target.checked)}
-                    className="rounded bg-darkBg border-borderColor text-accentBlue"
-                  />
-                  <span className="text-xs font-medium text-gray-300">Auto Breakeven (BE)</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer bg-darkBg/60 p-2 rounded-lg border border-borderColor/50 hover:border-borderColor transition">
-                  <input
-                    type="checkbox"
-                    checked={data.trailing_settings.enable_partial_booking ?? true}
-                    onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.enable_partial_booking`, e.target.checked)}
-                    className="rounded bg-darkBg border-borderColor text-emerald-400"
-                  />
-                  <span className="text-xs font-medium text-gray-300">Partial Book ({data.trailing_settings.partial_close_pct ?? 50}%)</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer bg-darkBg/60 p-2 rounded-lg border border-borderColor/50 hover:border-borderColor transition">
-                  <input
-                    type="checkbox"
-                    checked={data.trailing_settings.full_close_on_be ?? false}
-                    onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.full_close_on_be`, e.target.checked)}
-                    className="rounded bg-darkBg border-borderColor text-purple-400"
-                  />
-                  <span className="text-xs font-medium text-purple-300 font-semibold">Book 100% Full Trade</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer bg-darkBg/60 p-2 rounded-lg border border-borderColor/50 hover:border-borderColor transition">
-                  <input
-                    type="checkbox"
-                    checked={data.trailing_settings.static_sl ?? false}
-                    onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.static_sl`, e.target.checked)}
-                    className="rounded bg-darkBg border-borderColor text-rose-400"
-                  />
-                  <span className="text-xs font-medium text-rose-300 font-semibold">Static Stop Loss</span>
-                </label>
+
+              {/* Two Grouped Toggle Panels */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {/* Panel 1: Stop Loss Management */}
+                <div className="bg-darkBg/60 p-3 rounded-xl border border-borderColor/60 space-y-2">
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
+                    🛡️ Stop Loss Controls
+                  </span>
+                  <div className="space-y-1.5">
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-cardBg/60 border border-borderColor/40 hover:border-borderColor cursor-pointer transition">
+                      <span className="text-xs font-medium text-gray-300">Trail Stop Loss</span>
+                      <input
+                        type="checkbox"
+                        checked={data.trailing_settings.trail_sl ?? true}
+                        onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.trail_sl`, e.target.checked)}
+                        className="rounded bg-darkBg border-borderColor text-amber-400"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-cardBg/60 border border-borderColor/40 hover:border-borderColor cursor-pointer transition">
+                      <span className="text-xs font-medium text-gray-300">Auto Breakeven (BE)</span>
+                      <input
+                        type="checkbox"
+                        checked={data.trailing_settings.enable_breakeven ?? true}
+                        onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.enable_breakeven`, e.target.checked)}
+                        className="rounded bg-darkBg border-borderColor text-accentBlue"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-cardBg/60 border border-borderColor/40 hover:border-borderColor cursor-pointer transition">
+                      <span className="text-xs font-semibold text-rose-300">Static Stop Loss (Lock Initial SL)</span>
+                      <input
+                        type="checkbox"
+                        checked={data.trailing_settings.static_sl ?? false}
+                        onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.static_sl`, e.target.checked)}
+                        className="rounded bg-darkBg border-borderColor text-rose-400"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Panel 2: Take Profit & Exit Controls */}
+                <div className="bg-darkBg/60 p-3 rounded-xl border border-borderColor/60 space-y-2">
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
+                    🎯 Take Profit & Booking Controls
+                  </span>
+                  <div className="space-y-1.5">
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-cardBg/60 border border-borderColor/40 hover:border-borderColor cursor-pointer transition">
+                      <span className="text-xs font-medium text-gray-300">Trail Take Profit</span>
+                      <input
+                        type="checkbox"
+                        checked={data.trailing_settings.trail_tp ?? true}
+                        onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.trail_tp`, e.target.checked)}
+                        className="rounded bg-darkBg border-borderColor text-amber-400"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-cardBg/60 border border-borderColor/40 hover:border-borderColor cursor-pointer transition">
+                      <span className="text-xs font-medium text-gray-300">Partial Book ({data.trailing_settings.partial_close_pct ?? 50}%)</span>
+                      <input
+                        type="checkbox"
+                        checked={data.trailing_settings.enable_partial_booking ?? true}
+                        onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.enable_partial_booking`, e.target.checked)}
+                        className="rounded bg-darkBg border-borderColor text-emerald-400"
+                      />
+                    </label>
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-cardBg/60 border border-borderColor/40 hover:border-borderColor cursor-pointer transition">
+                      <span className="text-xs font-semibold text-purple-300">Book 100% Full Trade at Target</span>
+                      <input
+                        type="checkbox"
+                        checked={data.trailing_settings.full_close_on_be ?? false}
+                        onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.full_close_on_be`, e.target.checked)}
+                        className="rounded bg-darkBg border-borderColor text-purple-400"
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
           )}

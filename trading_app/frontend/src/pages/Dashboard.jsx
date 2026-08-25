@@ -5,6 +5,7 @@ import { useConfigStore } from '../store/configStore';
 import { useAnalyticsStore } from '../store/analyticsStore';
 import { MetricCard } from '../components/MetricCard';
 import { EquityChart } from '../components/EquityChart';
+import { formatCurrency } from '../utils/formatters';
 import { Wallet, TrendingUp, Cpu, Award, Zap, PieChart as PieIcon, Activity, CheckCircle, AlertCircle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -18,53 +19,49 @@ const SYMBOL_COLORS = {
 const DEFAULT_COLORS = ['#d29922', '#f78166', '#58a6ff', '#00d395', '#a371f7'];
 
 export const Dashboard = () => {
+  const account = useAccountStore((state) => state.account);
+  const openPositions = usePositionsStore((state) => state.openPositions);
+  const symbols = useConfigStore((state) => state.config?.SYMBOLS || {});
+  const updateField = useConfigStore((state) => state.updateField);
+  const fetchConfig = useConfigStore((state) => state.fetchConfig);
+  const symbolDistribution = useAnalyticsStore((state) => state.symbolDistribution);
+  const activityFeed = useAnalyticsStore((state) => state.activityFeed);
+
+  const [feedFilter, setFeedFilter] = useState('ALL');
   const [feedSearch, setFeedSearch] = useState('');
-  const [feedDirection, setFeedDirection] = useState('ALL');
   const [feedPage, setFeedPage] = useState(1);
   const [feedPageSize, setFeedPageSize] = useState(5);
 
-  const account = useAccountStore((state) => state.account);
-  const positions = usePositionsStore((state) => state.positions);
-  const config = useConfigStore((state) => state.config);
-  const updateField = useConfigStore((state) => state.updateField);
-
-  const symbolDistribution = useAnalyticsStore((state) => state.symbolDistribution);
-  const activityFeed = useAnalyticsStore((state) => state.activityFeed);
-  const fetchAnalytics = useAnalyticsStore((state) => state.fetchAnalytics);
-
   useEffect(() => {
-    fetchAnalytics();
+    fetchConfig();
   }, []);
 
-  const symbols = config?.SYMBOLS || {};
-  const openPnl = positions.reduce((acc, p) => acc + (p.profit || 0), 0);
+  const openPnl = openPositions.reduce((sum, pos) => sum + (pos.profit || 0), 0);
   const activeSymbolsCount = Object.values(symbols).filter((s) => s.enabled).length;
 
-  // Format donut data
-  const distEntries = Object.entries(symbolDistribution || {});
-  const totalVolume = distEntries.reduce((sum, [, count]) => sum + count, 0);
-
-  const donutData = distEntries.map(([sym, count]) => ({
-    name: sym,
-    value: count,
-    pct: totalVolume > 0 ? ((count / totalVolume) * 100).toFixed(0) : 0
+  const totalVolume = symbolDistribution.reduce((acc, curr) => acc + curr.value, 0);
+  const donutData = symbolDistribution.map((item) => ({
+    ...item,
+    pct: totalVolume > 0 ? ((item.value / totalVolume) * 100).toFixed(1) : 0,
   }));
-
   const hasDonutData = donutData.length > 0 && totalVolume > 0;
+
   const hasActivityData = Array.isArray(activityFeed) && activityFeed.length > 0;
 
-  // Activity Feed Filter & Pagination Logic
-  const filteredFeed = (activityFeed || []).filter((act) => {
-    const matchesDir = feedDirection === 'ALL' || act.direction === feedDirection;
-    const matchesSearch = !feedSearch || 
-      act.symbol?.toLowerCase().includes(feedSearch.toLowerCase()) ||
-      act.detail?.toLowerCase().includes(feedSearch.toLowerCase()) ||
-      act.time?.includes(feedSearch);
-    return matchesDir && matchesSearch;
+  // Filter & paginate feed
+  const filteredFeed = activityFeed.filter((item) => {
+    const matchesType = feedFilter === 'ALL' || item.type?.toLowerCase().includes(feedFilter.toLowerCase());
+    const matchesSearch = feedSearch === '' || 
+      item.symbol?.toLowerCase().includes(feedSearch.toLowerCase()) ||
+      item.detail?.toLowerCase().includes(feedSearch.toLowerCase()) ||
+      item.direction?.toLowerCase().includes(feedSearch.toLowerCase());
+    return matchesType && matchesSearch;
   });
 
   const totalFeedPages = Math.max(1, Math.ceil(filteredFeed.length / feedPageSize));
   const displayedFeed = filteredFeed.slice((feedPage - 1) * feedPageSize, feedPage * feedPageSize);
+
+  const currency = account.currency || 'USD';
 
   return (
     <div className="space-y-5 sm:space-y-6 pb-12">
@@ -72,13 +69,13 @@ export const Dashboard = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <MetricCard
           title="Total Balance"
-          value={`$${account.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          subtext="MT5 Account Capital"
+          value={formatCurrency(account.balance, currency)}
+          subtext={`MT5 Account Capital (${currency})`}
           icon={Wallet}
         />
         <MetricCard
           title="Floating P&L"
-          value={`${openPnl >= 0 ? '+' : ''}$${openPnl.toFixed(2)}`}
+          value={`${openPnl >= 0 ? '+' : ''}${formatCurrency(openPnl, currency)}`}
           indicator={openPnl >= 0 ? 'green' : 'red'}
           subtext="Unrealized open positions"
           icon={TrendingUp}
@@ -91,7 +88,7 @@ export const Dashboard = () => {
         />
         <MetricCard
           title="Daily P&L"
-          value={`${account.daily_pnl >= 0 ? '+' : ''}$${account.daily_pnl.toFixed(2)}`}
+          value={`${account.daily_pnl >= 0 ? '+' : ''}${formatCurrency(account.daily_pnl, currency)}`}
           indicator={account.daily_pnl >= 0 ? 'green' : 'red'}
           subtext="Today's closed trade P&L"
           icon={Award}

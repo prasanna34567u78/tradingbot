@@ -212,8 +212,8 @@ export const Configuration = () => {
           </div>
         </div>
 
-        {/* Symbol Cards Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Symbol Cards List */}
+        <div className="space-y-4">
           {Object.entries(symbols).map(([symbol, symbolData]) => (
             <SymbolCard
               key={symbol}
