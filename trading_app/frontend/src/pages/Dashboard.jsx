@@ -30,7 +30,7 @@ export const Dashboard = () => {
 
   const symbols = config?.SYMBOLS || EMPTY_OBJ;
 
-  const [feedFilter, setFeedFilter] = useState('ALL');
+  const [feedDirection, setFeedDirection] = useState('ALL');
   const [feedSearch, setFeedSearch] = useState('');
   const [feedPage, setFeedPage] = useState(1);
   const [feedPageSize, setFeedPageSize] = useState(5);
@@ -51,12 +51,13 @@ export const Dashboard = () => {
 
   // Filter & paginate feed
   const filteredFeed = (Array.isArray(activityFeed) ? activityFeed : []).filter((item) => {
-    const matchesType = feedFilter === 'ALL' || item.type?.toLowerCase().includes(feedFilter.toLowerCase());
+    const matchesDir = feedDirection === 'ALL' || item.direction?.toUpperCase() === feedDirection || item.type?.toUpperCase() === feedDirection;
     const matchesSearch = feedSearch === '' || 
       item.symbol?.toLowerCase().includes(feedSearch.toLowerCase()) ||
       item.detail?.toLowerCase().includes(feedSearch.toLowerCase()) ||
-      item.direction?.toLowerCase().includes(feedSearch.toLowerCase());
-    return matchesType && matchesSearch;
+      item.direction?.toLowerCase().includes(feedSearch.toLowerCase()) ||
+      item.time?.includes(feedSearch);
+    return matchesDir && matchesSearch;
   });
 
   const totalFeedPages = Math.max(1, Math.ceil(filteredFeed.length / feedPageSize));
