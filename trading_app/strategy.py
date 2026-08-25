@@ -476,6 +476,7 @@ class SMCStrategy:
             enable_breakeven = bool(trailing_config.get('enable_breakeven', True))
             enable_partial_booking = bool(trailing_config.get('enable_partial_booking', True))
             full_close_on_be = bool(trailing_config.get('full_close_on_be', False))
+            static_sl = bool(trailing_config.get('static_sl', False))
             partial_close_pct = float(trailing_config.get('partial_close_pct', 50.0))
             
             result = {
@@ -485,8 +486,8 @@ class SMCStrategy:
                 'partial_close_pct': partial_close_pct
             }
             
-            # 1. Breakeven Logic (Controlled by enable_breakeven toggle)
-            if enable_breakeven and not self.breakeven_activated and profit_tp_pct >= breakeven_ratio:
+            # 1. Breakeven Logic (Controlled by enable_breakeven toggle, skipped if static_sl)
+            if not static_sl and enable_breakeven and not self.breakeven_activated and profit_tp_pct >= breakeven_ratio:
                 be_buffer = self._get_breakeven_buffer(symbol, atr)
                 be_stop = entry_price + be_buffer if side == 'buy' else entry_price - be_buffer
                 
@@ -511,8 +512,8 @@ class SMCStrategy:
                     self.partial_booked = True
                     logger.info(f"[{symbol}] 🎯 Dynamic Partial Booking Triggered ({profit_tp_pct*100:.1f}% of TP). Booking {partial_close_pct}% lot.")
             
-            # 3. Trailing Stop Loss Logic (Controlled by trail_sl checkbox & start_ratio)
-            if trail_sl and profit_tp_pct >= start_ratio:
+            # 3. Trailing Stop Loss Logic (Skipped if static_sl is True)
+            if not static_sl and trail_sl and profit_tp_pct >= start_ratio:
                 self.trailing_activated = True
                 new_stop = self._calculate_trailing_stop(df, current_price, current_stop, atr, side)
                 if new_stop:
@@ -524,7 +525,7 @@ class SMCStrategy:
                         self.last_trail_price = new_stop
                         logger.info(f"[{symbol}] Trailing SL Advanced to {new_stop:.5f} (Profit: {profit_tp_pct*100:.1f}% of TP, Trail Step: {trail_step}x ATR)")
             
-            # 3. Trailing Take Profit Logic (Controlled by trail_tp checkbox & start_ratio)
+            # 4. Trailing Take Profit Logic (Controlled by trail_tp checkbox & start_ratio)
             if trail_tp and profit_tp_pct >= start_ratio:
                 new_tp = self._calculate_trailing_take_profit(df, current_price, current_tp, atr, side)
                 if new_tp and new_tp != current_tp:
