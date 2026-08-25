@@ -222,7 +222,7 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mt-3">
                 <label className="flex items-center gap-2 cursor-pointer bg-darkBg/60 p-2 rounded-lg border border-borderColor/50 hover:border-borderColor transition">
                   <input
                     type="checkbox"
@@ -258,6 +258,15 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
                     className="rounded bg-darkBg border-borderColor text-emerald-400"
                   />
                   <span className="text-xs font-medium text-gray-300">Partial Book ({data.trailing_settings.partial_close_pct ?? 50}%)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer bg-darkBg/60 p-2 rounded-lg border border-borderColor/50 hover:border-borderColor transition col-span-2 sm:col-span-1">
+                  <input
+                    type="checkbox"
+                    checked={data.trailing_settings.full_close_on_be ?? false}
+                    onChange={(e) => onChange(`SYMBOLS.${symbol}.trailing_settings.full_close_on_be`, e.target.checked)}
+                    className="rounded bg-darkBg border-borderColor text-purple-400"
+                  />
+                  <span className="text-xs font-medium text-purple-300 font-semibold">Book 100% Full Trade</span>
                 </label>
               </div>
             </div>

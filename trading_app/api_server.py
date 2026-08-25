@@ -1061,11 +1061,17 @@ async def start_bot():
             trailing = sym_cfg.get('trailing_settings', {})
             enable_be = trailing.get('enable_breakeven', True)
             enable_pb = trailing.get('enable_partial_booking', True)
+            full_close = trailing.get('full_close_on_be', False)
             be_ratio = trailing.get('breakeven_ratio', 0.5)
             part_pct = trailing.get('partial_close_pct', 50.0)
             be_display = f"{be_ratio}R" if enable_be else "OFF"
-            pb_display = f"{part_pct}%" if enable_pb else "OFF"
-            append_log("INFO", f"[{sym}] Loaded — Lots: {lot_display} | TP Ratio: {tp_ratio}R | Risk: {risk_pct}% | BE: {be_display} | Partial Book: {pb_display} | Enabled: {sym_cfg.get('enabled', False)}")
+            if full_close:
+                pb_display = "100% (Full Close)"
+            elif enable_pb:
+                pb_display = f"{part_pct}%"
+            else:
+                pb_display = "OFF"
+            append_log("INFO", f"[{sym}] Loaded — Lots: {lot_display} | TP Ratio: {tp_ratio}R | Risk: {risk_pct}% | BE: {be_display} | Target Book: {pb_display} | Enabled: {sym_cfg.get('enabled', False)}")
 
         return {
             "status": "success",
