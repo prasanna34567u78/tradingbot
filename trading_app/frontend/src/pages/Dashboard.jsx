@@ -20,12 +20,14 @@ const DEFAULT_COLORS = ['#d29922', '#f78166', '#58a6ff', '#00d395', '#a371f7'];
 
 export const Dashboard = () => {
   const account = useAccountStore((state) => state.account);
-  const openPositions = usePositionsStore((state) => state.openPositions);
+  const positions = usePositionsStore((state) => state.positions) || [];
+  const fetchPositions = usePositionsStore((state) => state.fetchPositions);
   const symbols = useConfigStore((state) => state.config?.SYMBOLS || {});
   const updateField = useConfigStore((state) => state.updateField);
   const fetchConfig = useConfigStore((state) => state.fetchConfig);
-  const symbolDistribution = useAnalyticsStore((state) => state.symbolDistribution);
-  const activityFeed = useAnalyticsStore((state) => state.activityFeed);
+  const symbolDistribution = useAnalyticsStore((state) => state.symbolDistribution) || {};
+  const activityFeed = useAnalyticsStore((state) => state.activityFeed) || [];
+  const fetchAnalytics = useAnalyticsStore((state) => state.fetchAnalytics);
 
   const [feedFilter, setFeedFilter] = useState('ALL');
   const [feedSearch, setFeedSearch] = useState('');
@@ -34,22 +36,26 @@ export const Dashboard = () => {
 
   useEffect(() => {
     fetchConfig();
+    fetchPositions();
+    fetchAnalytics();
   }, []);
 
-  const openPnl = openPositions.reduce((sum, pos) => sum + (pos.profit || 0), 0);
+  const openPnl = (Array.isArray(positions) ? positions : []).reduce((sum, pos) => sum + (pos?.profit || 0), 0);
   const activeSymbolsCount = Object.values(symbols).filter((s) => s.enabled).length;
 
-  const totalVolume = symbolDistribution.reduce((acc, curr) => acc + curr.value, 0);
-  const donutData = symbolDistribution.map((item) => ({
-    ...item,
-    pct: totalVolume > 0 ? ((item.value / totalVolume) * 100).toFixed(1) : 0,
+  const distEntries = Object.entries(symbolDistribution || {});
+  const totalVolume = distEntries.reduce((sum, [, count]) => sum + Number(count || 0), 0);
+  const donutData = distEntries.map(([name, count]) => ({
+    name,
+    value: Number(count || 0),
+    pct: totalVolume > 0 ? ((Number(count || 0) / totalVolume) * 100).toFixed(1) : 0,
   }));
   const hasDonutData = donutData.length > 0 && totalVolume > 0;
 
   const hasActivityData = Array.isArray(activityFeed) && activityFeed.length > 0;
 
   // Filter & paginate feed
-  const filteredFeed = activityFeed.filter((item) => {
+  const filteredFeed = (Array.isArray(activityFeed) ? activityFeed : []).filter((item) => {
     const matchesType = feedFilter === 'ALL' || item.type?.toLowerCase().includes(feedFilter.toLowerCase());
     const matchesSearch = feedSearch === '' || 
       item.symbol?.toLowerCase().includes(feedSearch.toLowerCase()) ||
@@ -61,7 +67,7 @@ export const Dashboard = () => {
   const totalFeedPages = Math.max(1, Math.ceil(filteredFeed.length / feedPageSize));
   const displayedFeed = filteredFeed.slice((feedPage - 1) * feedPageSize, feedPage * feedPageSize);
 
-  const currency = account.currency || 'USD';
+  const currency = account?.currency || 'USD';
 
   return (
     <div className="space-y-5 sm:space-y-6 pb-12">
