@@ -1,5 +1,9 @@
 # Main entry point for the Gold Trading Bot
 
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', module='sklearn')
+
 import time
 import logging
 import pandas as pd

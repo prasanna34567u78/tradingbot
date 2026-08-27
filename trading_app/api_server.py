@@ -2,6 +2,9 @@ import os
 import sys
 import json
 import time
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', module='sklearn')
 import sqlite3
 import asyncio
 import importlib
