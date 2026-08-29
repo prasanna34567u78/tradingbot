@@ -463,48 +463,81 @@ export const Configuration = () => {
           </h3>
           <div className="space-y-3">
             <div>
-              <div className="flex justify-between text-gray-300 mb-1">
-                <span>Max Total Risk %</span>
-                <span className="font-bold text-white">{config.RISK_MANAGEMENT?.max_total_risk}%</span>
+              <div className="flex justify-between items-center text-gray-300 mb-1">
+                <span>Max Total Risk (Portfolio Limit) %</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="0.5"
+                    max="100.0"
+                    step="0.5"
+                    value={config.RISK_MANAGEMENT?.max_total_risk ?? 15.0}
+                    onChange={(e) => updateField('RISK_MANAGEMENT.max_total_risk', Math.min(100.0, Math.max(0.5, parseFloat(e.target.value) || 0.5)))}
+                    className="w-16 bg-darkBg border border-borderColor rounded px-1.5 py-0.5 text-right font-bold text-white font-mono text-xs"
+                  />
+                  <span className="font-bold text-white">%</span>
+                </div>
               </div>
               <input
                 type="range"
                 min="0.5"
-                max="10.0"
-                step="0.1"
-                value={config.RISK_MANAGEMENT?.max_total_risk || 2.0}
+                max="100.0"
+                step="0.5"
+                value={config.RISK_MANAGEMENT?.max_total_risk ?? 15.0}
                 onChange={(e) => updateField('RISK_MANAGEMENT.max_total_risk', parseFloat(e.target.value))}
                 className="w-full accent-accentRed"
               />
             </div>
 
             <div>
-              <div className="flex justify-between text-gray-300 mb-1">
+              <div className="flex justify-between items-center text-gray-300 mb-1">
                 <span>Max Correlated Risk %</span>
-                <span className="font-bold text-white">{config.RISK_MANAGEMENT?.max_correlated_risk}%</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="0.5"
+                    max="50.0"
+                    step="0.5"
+                    value={config.RISK_MANAGEMENT?.max_correlated_risk ?? 5.0}
+                    onChange={(e) => updateField('RISK_MANAGEMENT.max_correlated_risk', Math.min(50.0, Math.max(0.5, parseFloat(e.target.value) || 0.5)))}
+                    className="w-16 bg-darkBg border border-borderColor rounded px-1.5 py-0.5 text-right font-bold text-white font-mono text-xs"
+                  />
+                  <span className="font-bold text-white">%</span>
+                </div>
               </div>
               <input
                 type="range"
                 min="0.5"
-                max="5.0"
-                step="0.1"
-                value={config.RISK_MANAGEMENT?.max_correlated_risk || 1.5}
+                max="50.0"
+                step="0.5"
+                value={config.RISK_MANAGEMENT?.max_correlated_risk ?? 5.0}
                 onChange={(e) => updateField('RISK_MANAGEMENT.max_correlated_risk', parseFloat(e.target.value))}
                 className="w-full accent-accentRed"
               />
             </div>
 
             <div>
-              <div className="flex justify-between text-gray-300 mb-1">
+              <div className="flex justify-between items-center text-gray-300 mb-1">
                 <span>Max Drawdown Stop %</span>
-                <span className="font-bold text-accentRed">{config.RISK_MANAGEMENT?.max_drawdown_stop}%</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="1.0"
+                    max="50.0"
+                    step="0.5"
+                    value={config.RISK_MANAGEMENT?.max_drawdown_stop ?? 15.0}
+                    onChange={(e) => updateField('RISK_MANAGEMENT.max_drawdown_stop', Math.min(50.0, Math.max(1.0, parseFloat(e.target.value) || 1.0)))}
+                    className="w-16 bg-darkBg border border-borderColor rounded px-1.5 py-0.5 text-right font-bold text-accentRed font-mono text-xs"
+                  />
+                  <span className="font-bold text-accentRed">%</span>
+                </div>
               </div>
               <input
                 type="range"
                 min="1.0"
-                max="20.0"
+                max="50.0"
                 step="0.5"
-                value={config.RISK_MANAGEMENT?.max_drawdown_stop || 8.0}
+                value={config.RISK_MANAGEMENT?.max_drawdown_stop ?? 15.0}
                 onChange={(e) => updateField('RISK_MANAGEMENT.max_drawdown_stop', parseFloat(e.target.value))}
                 className="w-full accent-accentRed"
               />
@@ -516,9 +549,9 @@ export const Configuration = () => {
                 <input
                   type="number"
                   step="0.5"
-                  value={config.RISK_MANAGEMENT?.daily_loss_limit || 3.0}
+                  value={config.RISK_MANAGEMENT?.daily_loss_limit || 10.0}
                   onChange={(e) => updateField('RISK_MANAGEMENT.daily_loss_limit', parseFloat(e.target.value))}
-                  className="w-full bg-darkBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white"
+                  className="w-full bg-darkBg border border-borderColor rounded-lg px-3 py-2 text-white font-mono"
                 />
               </div>
               <div>
