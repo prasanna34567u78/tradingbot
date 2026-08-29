@@ -78,12 +78,26 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <label className="block text-gray-400 mb-1">Risk per Trade: <span className="text-white font-semibold">{data?.risk_percent}%</span></label>
+                <div className="flex justify-between items-center text-gray-400 mb-1">
+                  <span>Risk per Trade:</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="0.1"
+                      max="50.0"
+                      step="0.1"
+                      value={data?.risk_percent ?? 1.0}
+                      onChange={(e) => onChange(`SYMBOLS.${symbol}.risk_percent`, Math.min(50.0, Math.max(0.1, parseFloat(e.target.value) || 0.1)))}
+                      className="w-16 bg-darkBg border border-borderColor rounded px-1.5 py-0.5 text-right font-bold text-accentBlue font-mono text-xs"
+                    />
+                    <span className="text-white font-bold">%</span>
+                  </div>
+                </div>
                 <input
                   type="range"
                   min="0.1"
-                  max="5.0"
-                  step="0.1"
+                  max="50.0"
+                  step="0.5"
                   value={data?.risk_percent || 1.0}
                   onChange={(e) => onChange(`SYMBOLS.${symbol}.risk_percent`, parseFloat(e.target.value))}
                   className="w-full accent-accentBlue"
@@ -137,7 +151,7 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
                   type="number"
                   step="0.01"
                   min="0.01"
-                  max="1.0"
+                  max="5.0"
                   value={data?.max_lot_size || 0.10}
                   onChange={(e) => onChange(`SYMBOLS.${symbol}.max_lot_size`, parseFloat(e.target.value) || 0.10)}
                   className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono"
@@ -158,33 +172,66 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
               </div>
             </div>
 
-            {/* Fixed Lot Size Option */}
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 bg-cardBg p-3 rounded-xl border border-borderColor">
-              <div>
-                <span className="text-gray-200 font-semibold block">Fixed Micro-Lot Override:</span>
-                <span className="text-gray-400 text-[11px]">
-                  {data?.fixed_lot_size !== null && data?.fixed_lot_size !== undefined 
-                    ? `Locked at ${data.fixed_lot_size} lots per trade` 
-                    : `Using dynamic sizing based on ${data?.risk_percent || 1}% of ${currency} balance`}
-                </span>
+            {/* Position Sizing Controls: Fixed Lot vs Fixed Money Amount */}
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Option A: Fixed Lot Size */}
+              <div className="bg-cardBg p-3 rounded-xl border border-borderColor flex flex-col justify-between space-y-2">
+                <div>
+                  <span className="text-gray-200 font-semibold block text-xs">Option 1: Fixed Lot Size</span>
+                  <span className="text-gray-400 text-[11px]">
+                    {data?.fixed_lot_size !== null && data?.fixed_lot_size !== undefined 
+                      ? `Locked at ${data.fixed_lot_size} lots per trade` 
+                      : `Inactive (using dynamic calculation)`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.02"
+                    disabled={data?.fixed_lot_size === null || data?.fixed_lot_size === undefined}
+                    value={data?.fixed_lot_size ?? ''}
+                    onChange={(e) => onChange(`SYMBOLS.${symbol}.fixed_lot_size`, parseFloat(e.target.value) || 0.01)}
+                    className="w-24 bg-darkBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono disabled:opacity-40 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onChange(`SYMBOLS.${symbol}.fixed_lot_size`, (data?.fixed_lot_size === null || data?.fixed_lot_size === undefined) ? 0.02 : null)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${(data?.fixed_lot_size === null || data?.fixed_lot_size === undefined) ? 'bg-accentBlue text-white shadow' : 'bg-gray-700 text-gray-300'}`}
+                  >
+                    {(data?.fixed_lot_size === null || data?.fixed_lot_size === undefined) ? 'Lock Fixed Lots' : 'Use Dynamic'}
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.02"
-                  disabled={data?.fixed_lot_size === null}
-                  value={data?.fixed_lot_size ?? ''}
-                  onChange={(e) => onChange(`SYMBOLS.${symbol}.fixed_lot_size`, parseFloat(e.target.value) || 0.01)}
-                  className="w-24 bg-darkBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono disabled:opacity-40"
-                />
-                <button
-                  type="button"
-                  onClick={() => onChange(`SYMBOLS.${symbol}.fixed_lot_size`, data?.fixed_lot_size === null ? 0.02 : null)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${data?.fixed_lot_size === null ? 'bg-accentBlue text-white shadow' : 'bg-gray-700 text-gray-300'}`}
-                >
-                  {data?.fixed_lot_size === null ? 'Lock Fixed Lots' : 'Use Dynamic %'}
-                </button>
+
+              {/* Option B: Max Fixed Money Risk Amount */}
+              <div className="bg-cardBg p-3 rounded-xl border border-borderColor flex flex-col justify-between space-y-2">
+                <div>
+                  <span className="text-gray-200 font-semibold block text-xs">Option 2: Fixed Risk Amount ({currSym} {currency})</span>
+                  <span className="text-gray-400 text-[11px]">
+                    {data?.max_risk_amount !== null && data?.max_risk_amount !== undefined 
+                      ? `Max loss capped at ${currSym}${data.max_risk_amount} per trade` 
+                      : `Inactive (using ${data?.risk_percent || 1}% of balance)`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="10"
+                    placeholder={currency === 'INR' ? '500' : '50'}
+                    disabled={data?.max_risk_amount === null || data?.max_risk_amount === undefined}
+                    value={data?.max_risk_amount ?? ''}
+                    onChange={(e) => onChange(`SYMBOLS.${symbol}.max_risk_amount`, parseFloat(e.target.value) || 0)}
+                    className="w-28 bg-darkBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono disabled:opacity-40 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onChange(`SYMBOLS.${symbol}.max_risk_amount`, (data?.max_risk_amount === null || data?.max_risk_amount === undefined) ? (currency === 'INR' ? 500 : 50) : null)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${(data?.max_risk_amount === null || data?.max_risk_amount === undefined) ? 'bg-emerald-600 text-white shadow' : 'bg-gray-700 text-gray-300'}`}
+                  >
+                    {(data?.max_risk_amount === null || data?.max_risk_amount === undefined) ? `Set ${currSym} Risk` : 'Use %'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
