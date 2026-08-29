@@ -188,6 +188,49 @@ export const Configuration = () => {
         </div>
       </div>
 
+      {/* Section 3.6 — Primary Timeframe Selection */}
+      <div className="bg-cardBg border border-borderColor p-5 rounded-2xl space-y-3 shadow-lg">
+        <h3 className="font-bold text-white text-sm flex items-center gap-2">
+          <Clock size={16} className="text-accentBlue" /> 3.6 Primary Trading Timeframe
+        </h3>
+        <p className="text-gray-400 text-xs">
+          Select the primary candle resolution used for market structure analysis and signal execution.
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-1">
+          {[
+            { id: '1m', label: '1 Minute (1M)', desc: 'Ultra-fast microstructure orderflow & M1 scalping' },
+            { id: '5m', label: '5 Minutes (5M)', desc: 'Standard high-frequency PDE & SMC primary setup' },
+            { id: '15m', label: '15 Minutes (15M)', desc: 'Intraday structural continuation & liquidity sweeps' },
+            { id: '1h', label: '1 Hour (1H)', desc: 'Macro swing value area & high-timeframe trend' },
+          ].map((tf) => {
+            const currentTf = config.TIMEFRAMES?.primary || '5m';
+            const isCurrent = (currentTf === tf.id);
+            return (
+              <div
+                key={tf.id}
+                onClick={() => {
+                  updateField('TIMEFRAMES.primary', tf.id);
+                  updateField('PDE_SETTINGS.timeframe', tf.id);
+                }}
+                className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                  isCurrent
+                    ? 'border-accentBlue bg-accentBlue/10 shadow-md ring-1 ring-accentBlue'
+                    : 'border-borderColor bg-darkBg hover:border-gray-600'
+                }`}
+              >
+                <div className="font-bold text-xs text-white mb-1 flex items-center justify-between">
+                  <span className={isCurrent ? 'text-accentBlue' : 'text-white'}>{tf.label}</span>
+                  {isCurrent && (
+                    <span className="text-[10px] font-bold bg-accentBlue text-white px-2 py-0.5 rounded-full">ACTIVE</span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-400">{tf.desc}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* 🌐 Master Global Risk Management (Across All Pairs) */}
       <div className="bg-gradient-to-r from-cardBg via-cardBg to-darkBg border border-accentBlue/40 p-5 rounded-2xl space-y-4 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-borderColor/60 pb-3">
