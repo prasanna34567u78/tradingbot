@@ -257,26 +257,20 @@ class MT5Executor:
         """
         try:
             symbol_config = config.SYMBOLS.get(symbol, {})
-            
-            # 1. FIXED LOT SIZE (Explicit user micro-lot override)
-            fixed_lot_size = symbol_config.get('fixed_lot_size') or symbol_config.get('lot_size')
-            if fixed_lot_size is not None and float(fixed_lot_size) > 0:
-                logger.info(f"[{symbol}] Using FIXED Lot Size: {float(fixed_lot_size):.2f} lots")
-                return float(fixed_lot_size)
-            
-            # 2. CALCULATE BASE RISK AMOUNT IN ACCOUNT CURRENCY
             account_currency = self.get_account_currency()
+            fixed_lot_size = symbol_config.get('fixed_lot_size') or symbol_config.get('lot_size')
             max_money_risk = symbol_config.get('max_risk_amount')
             
+            # 1. CALCULATE BASE RISK AMOUNT IN ACCOUNT CURRENCY
             if max_money_risk is not None and float(max_money_risk) > 0:
                 risk_amount_acc = float(max_money_risk)
-                logger.info(f"[{symbol}] Using FIXED Money Risk: {risk_amount_acc:.2f} {account_currency}")
+                logger.info(f"[{symbol}] Using Money Risk Limit: {risk_amount_acc:.2f} {account_currency}")
             else:
                 base_risk_percent = float(symbol_config.get('risk_percent', 1.0))
                 risk_amount_acc = account_balance * (base_risk_percent / 100.0)
                 logger.info(f"[{symbol}] Using Dynamic Risk {base_risk_percent}% of {account_balance:.2f} {account_currency} = {risk_amount_acc:.2f} {account_currency}")
 
-            # 3. CONVERT RISK AMOUNT TO USD (Since Gold/Forex contracts are USD-based)
+            # 2. CONVERT RISK AMOUNT TO USD (Since Gold/Forex contracts are USD-based)
             usd_rate = self.get_usd_conversion_rate(account_currency)
             risk_amount_usd = risk_amount_acc / usd_rate
             
@@ -291,25 +285,38 @@ class MT5Executor:
             volume_min = symbol_spec.get('volume_min', 0.01)
             volume_step = symbol_spec.get('volume_step', 0.01)
 
-            # 4. PRECISE LOT CALCULATION BY ASSET CLASS
+            # 3. PRECISE LOT CALCULATION BY ASSET CLASS
             if 'XAU' in symbol or 'GOLD' in symbol.upper():
                 # Gold: 1 Lot = 100 oz -> $1.00 move = $100 USD
                 # Lots = USD Risk Amount / (Points difference * 100)
-                position_size = risk_amount_usd / (price_diff * 100.0)
+                calculated_lots = risk_amount_usd / (price_diff * 100.0)
             elif 'BTC' in symbol:
                 # BTC: 1 Lot = 1 BTC -> $1.00 move = $1.00 USD
-                position_size = risk_amount_usd / price_diff
+                calculated_lots = risk_amount_usd / price_diff
             elif 'USD' in symbol and symbol.endswith('m'):
                 # Forex: 1 Standard Lot = 100,000 units -> $10/pip
                 pip_value = 10.0
                 stop_loss_pips = price_diff / (point * 10.0)
-                position_size = risk_amount_usd / (max(stop_loss_pips, 1.0) * pip_value)
+                calculated_lots = risk_amount_usd / (max(stop_loss_pips, 1.0) * pip_value)
             else:
                 # Generic asset
-                position_size = risk_amount_usd / (price_diff * 100.0)
+                calculated_lots = risk_amount_usd / (price_diff * 100.0)
+
+            # 4. DUAL CONSIDERATION: If Fixed Lot is enabled, take min(Fixed Lot, Money Risk Lot)
+            if fixed_lot_size is not None and float(fixed_lot_size) > 0:
+                fixed_val = float(fixed_lot_size)
+                if max_money_risk is not None and float(max_money_risk) > 0:
+                    # Both options enabled: strictly use fixed lot unless risk cap demands smaller
+                    position_size = min(fixed_val, calculated_lots)
+                    logger.info(f"[{symbol}] Dual Risk Active: Fixed Lot {fixed_val} vs Max Risk Cap Lot {calculated_lots:.2f} -> Using {position_size:.2f} lots")
+                else:
+                    position_size = fixed_val
+                    logger.info(f"[{symbol}] Using FIXED Lot Size: {position_size:.2f} lots")
+            else:
+                position_size = calculated_lots
 
             # 5. VOLATILITY ADJUSTMENT
-            if symbol_config.get('volatility_adj', False):
+            if symbol_config.get('volatility_adj', False) and (fixed_lot_size is None or float(fixed_lot_size) <= 0):
                 try:
                     df = self.fetch_historical_data_mt5_symbol(symbol, '1h', 24)
                     if df is not None and len(df) > 20:
@@ -332,7 +339,7 @@ class MT5Executor:
             final_position_size = min(position_size, max_allowed_lot)
 
             logger.info(
-                f"[{symbol}] Position Sized: {final_position_size:.2f} lots "
+                f"[{symbol}] Final Position Size: {final_position_size:.2f} lots "
                 f"(Risk: {risk_amount_acc:.2f} {account_currency} / ${risk_amount_usd:.2f} USD | "
                 f"SL Distance: {price_diff:.3f} pts | Max Cap: {max_allowed_lot:.2f} lots)"
             )
