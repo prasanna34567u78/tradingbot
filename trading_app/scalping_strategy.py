@@ -170,16 +170,77 @@ class ScalpingStrategy:
             if self.current_trade is not None:
                 return df
             
-            # Apply scalping strategies
-            self._apply_momentum_scalping_strategy(df)
-            self._apply_mean_reversion_scalping_strategy(df)
-            self._apply_breakout_scalping_strategy(df)
+            # Apply scalping strategies in priority order
+            self._apply_fvg_orderflow_scalping_strategy(df)
+            if df.loc[df.index[-1], 'signal'] == 0:
+                self._apply_momentum_scalping_strategy(df)
+            if df.loc[df.index[-1], 'signal'] == 0:
+                self._apply_mean_reversion_scalping_strategy(df)
+            if df.loc[df.index[-1], 'signal'] == 0:
+                self._apply_breakout_scalping_strategy(df)
             
             return df
             
         except Exception as e:
             logger.error(f"Error generating scalping signals: {e}")
             return df
+    
+    def _apply_fvg_orderflow_scalping_strategy(self, df, symbol="XAUUSDm"):
+        """Apply High-Performance 1M Fair Value Gap + CVD Delta Scalping"""
+        try:
+            if len(df) < 5:
+                return
+            latest_idx = df.index[-1]
+            latest = df.iloc[-1]
+            prev1 = df.iloc[-2]
+            prev2 = df.iloc[-3]
+            
+            # Volume & Delta Imbalance
+            vol_ma = df['volume'].rolling(20).mean().iloc[-1] if 'volume' in df.columns else 100
+            curr_vol = latest.get('volume', 100)
+            vol_spike = curr_vol > (vol_ma * 1.30)
+            
+            price_range = max(latest['high'] - latest['low'], 1e-5)
+            bar_delta = curr_vol * ((latest['close'] - latest['open']) / price_range)
+            
+            # FVG Imbalance
+            bull_fvg = (prev1['low'] > prev2['high']) and (prev1['close'] > prev1['open'])
+            bear_fvg = (prev1['high'] < prev2['low']) and (prev1['close'] < prev1['open'])
+            
+            atr = latest.get('atr', 1.0)
+            min_sl = 1.10 if ('XAU' in str(symbol).upper() or 'GOLD' in str(symbol).upper()) else 0.0008
+            sl_dist = max(atr * 0.95, min_sl)
+            
+            # Bullish FVG Retest Scalp
+            if bull_fvg and (bar_delta > 0 or vol_spike) and (latest['low'] <= prev2['high'] <= latest['high']):
+                entry_price = prev2['high']
+                stop_loss = entry_price - sl_dist
+                take_profit = entry_price + 2.00  # $2.00 target on Gold
+                
+                df.loc[latest_idx, 'signal'] = 1
+                df.loc[latest_idx, 'entry_price'] = entry_price
+                df.loc[latest_idx, 'stop_loss'] = stop_loss
+                df.loc[latest_idx, 'take_profit'] = take_profit
+                df.loc[latest_idx, 'signal_type'] = 'fvg_orderflow_buy'
+                df.loc[latest_idx, 'scalp_confidence'] = 0.88
+                logger.info(f"[{symbol}] FVG Orderflow BUY Signal - Entry: {entry_price:.3f}, SL: {stop_loss:.3f}, TP: {take_profit:.3f}")
+                
+            # Bearish FVG Retest Scalp
+            elif bear_fvg and (bar_delta < 0 or vol_spike) and (latest['low'] <= prev2['low'] <= latest['high']):
+                entry_price = prev2['low']
+                stop_loss = entry_price + sl_dist
+                take_profit = entry_price - 2.00  # $2.00 target on Gold
+                
+                df.loc[latest_idx, 'signal'] = -1
+                df.loc[latest_idx, 'entry_price'] = entry_price
+                df.loc[latest_idx, 'stop_loss'] = stop_loss
+                df.loc[latest_idx, 'take_profit'] = take_profit
+                df.loc[latest_idx, 'signal_type'] = 'fvg_orderflow_sell'
+                df.loc[latest_idx, 'scalp_confidence'] = 0.88
+                logger.info(f"[{symbol}] FVG Orderflow SELL Signal - Entry: {entry_price:.3f}, SL: {stop_loss:.3f}, TP: {take_profit:.3f}")
+                
+        except Exception as e:
+            logger.error(f"Error in FVG orderflow scalping strategy: {e}")
     
     def _get_pip_multiplier(self, symbol="XAUUSDm"):
         s = str(symbol).upper()
