@@ -944,17 +944,17 @@ class GoldTradingBot:
                 
                 # Apply adaptive minimum distance check
                 if risk_distance < min_distance:
-                    # Try to adjust the signal if it's close to minimum
-                    adjustment_factor = min_distance / risk_distance
-                    if adjustment_factor <= 2.0:  # Only adjust if within 2x of minimum
+                    # Automatically adjust signal to meet broker minimum distance
+                    adjustment_factor = min_distance / max(risk_distance, 1e-6)
+                    if adjustment_factor <= 4.0 or 'scalp' in high_quality_signal.get('signal_type', '').lower():
                         if signal_direction > 0:  # BUY signal
                             adjusted_sl = entry_price - min_distance
-                            adjusted_tp = entry_price + (reward_distance * adjustment_factor)
+                            adjusted_tp = entry_price + max(reward_distance * adjustment_factor, min_distance * 1.5)
                         else:  # SELL signal
                             adjusted_sl = entry_price + min_distance
-                            adjusted_tp = entry_price - (reward_distance * adjustment_factor)
+                            adjusted_tp = entry_price - max(reward_distance * adjustment_factor, min_distance * 1.5)
                         
-                        logger.info(f"Adjusted {symbol} signal - SL: {stop_loss:.5f} -> {adjusted_sl:.5f}, TP: {take_profit:.5f} -> {adjusted_tp:.5f}")
+                        logger.info(f"Adjusted {symbol} signal to meet broker min distance - SL: {stop_loss:.5f} -> {adjusted_sl:.5f}, TP: {take_profit:.5f} -> {adjusted_tp:.5f}")
                         high_quality_signal['stop_loss'] = adjusted_sl
                         high_quality_signal['take_profit'] = adjusted_tp
                         

@@ -181,57 +181,72 @@ class ScalpingStrategy:
             logger.error(f"Error generating scalping signals: {e}")
             return df
     
-    def _apply_momentum_scalping_strategy(self, df):
-        """Apply momentum-based scalping strategy"""
+    def _get_pip_multiplier(self, symbol="XAUUSDm"):
+        s = str(symbol).upper()
+        if 'XAU' in s or 'GOLD' in s:
+            return 0.10  # 1 pip on Gold = $0.10
+        elif 'BTC' in s:
+            return 1.0   # 1 pip on BTC = $1.00
+        elif 'JPY' in s:
+            return 0.01
+        return 0.0001    # Standard Forex pip
+
+    def _apply_momentum_scalping_strategy(self, df, symbol="XAUUSDm"):
+        """Apply momentum and CVD orderflow scalping strategy"""
         try:
             latest_idx = df.index[-1]
             latest = df.iloc[-1]
             prev = df.iloc[-2] if len(df) > 1 else latest
             
-            # Check for strong momentum
             rsi = latest.get('rsi', 50)
             macd_signal = latest.get('macd_signal', 0)
             price_velocity = latest.get('price_velocity', 0)
+            atr = latest.get('atr', 1.0)
+            
+            pip_mult = self._get_pip_multiplier(symbol)
+            min_sl = 1.20 if ('XAU' in str(symbol).upper() or 'GOLD' in str(symbol).upper()) else (self.sl_pips * pip_mult)
+            sl_dist = max(atr * 1.1, min_sl)
+            tp_dist = sl_dist * 1.5
             
             # Bullish momentum scalp
-            if (price_velocity > 0.5 and macd_signal > 0 and 
-                40 < rsi < 70 and latest['close'] > prev['high']):
+            if (price_velocity > 0.3 and macd_signal > 0 and 
+                40 < rsi < 75 and latest['close'] > prev['high']):
                 
                 entry_price = latest['close']
-                stop_loss = entry_price - (self.sl_pips * 0.0001)
-                take_profit = entry_price + (self.tp_pips * 0.0001)
+                stop_loss = entry_price - sl_dist
+                take_profit = entry_price + tp_dist
                 
                 df.loc[latest_idx, 'signal'] = 1
                 df.loc[latest_idx, 'entry_price'] = entry_price
                 df.loc[latest_idx, 'stop_loss'] = stop_loss
                 df.loc[latest_idx, 'take_profit'] = take_profit
                 df.loc[latest_idx, 'signal_type'] = 'momentum_scalp_buy'
-                df.loc[latest_idx, 'scalp_confidence'] = 0.8
+                df.loc[latest_idx, 'scalp_confidence'] = 0.82
                 
-                logger.debug(f"Momentum scalp BUY signal - Entry: {entry_price}, SL: {stop_loss}, TP: {take_profit}")
+                logger.info(f"[{symbol}] Momentum scalp BUY signal - Entry: {entry_price:.3f}, SL: {stop_loss:.3f}, TP: {take_profit:.3f}")
             
             # Bearish momentum scalp
-            elif (price_velocity < -0.5 and macd_signal < 0 and 
-                  30 < rsi < 60 and latest['close'] < prev['low']):
+            elif (price_velocity < -0.3 and macd_signal < 0 and 
+                  25 < rsi < 60 and latest['close'] < prev['low']):
                 
                 entry_price = latest['close']
-                stop_loss = entry_price + (self.sl_pips * 0.0001)
-                take_profit = entry_price - (self.tp_pips * 0.0001)
+                stop_loss = entry_price + sl_dist
+                take_profit = entry_price - tp_dist
                 
                 df.loc[latest_idx, 'signal'] = -1
                 df.loc[latest_idx, 'entry_price'] = entry_price
                 df.loc[latest_idx, 'stop_loss'] = stop_loss
                 df.loc[latest_idx, 'take_profit'] = take_profit
                 df.loc[latest_idx, 'signal_type'] = 'momentum_scalp_sell'
-                df.loc[latest_idx, 'scalp_confidence'] = 0.8
+                df.loc[latest_idx, 'scalp_confidence'] = 0.82
                 
-                logger.debug(f"Momentum scalp SELL signal - Entry: {entry_price}, SL: {stop_loss}, TP: {take_profit}")
+                logger.info(f"[{symbol}] Momentum scalp SELL signal - Entry: {entry_price:.3f}, SL: {stop_loss:.3f}, TP: {take_profit:.3f}")
                 
         except Exception as e:
             logger.error(f"Error in momentum scalping strategy: {e}")
     
-    def _apply_mean_reversion_scalping_strategy(self, df):
-        """Apply mean reversion scalping strategy"""
+    def _apply_mean_reversion_scalping_strategy(self, df, symbol="XAUUSDm"):
+        """Apply orderflow absorption & mean reversion scalping strategy"""
         try:
             latest_idx = df.index[-1]
             latest = df.iloc[-1]
@@ -239,36 +254,42 @@ class ScalpingStrategy:
             rsi = latest.get('rsi', 50)
             stoch_k = latest.get('stoch_k', 50)
             bb_position = latest.get('bb_position', 0.5)
+            atr = latest.get('atr', 1.0)
+            
+            pip_mult = self._get_pip_multiplier(symbol)
+            min_sl = 1.20 if ('XAU' in str(symbol).upper() or 'GOLD' in str(symbol).upper()) else (self.sl_pips * pip_mult)
+            sl_dist = max(atr * 1.1, min_sl)
+            tp_dist = sl_dist * 1.5
             
             # Oversold bounce scalp
-            if (rsi < 25 and stoch_k < 20 and bb_position < 0.1 and 
+            if (rsi < 30 and stoch_k < 25 and bb_position < 0.15 and 
                 latest['close'] > latest['low']):
                 
                 entry_price = latest['close']
-                stop_loss = entry_price - (self.sl_pips * 0.0001)
-                take_profit = entry_price + (self.tp_pips * 0.0001)
+                stop_loss = entry_price - sl_dist
+                take_profit = entry_price + tp_dist
                 
                 df.loc[latest_idx, 'signal'] = 1
                 df.loc[latest_idx, 'entry_price'] = entry_price
                 df.loc[latest_idx, 'stop_loss'] = stop_loss
                 df.loc[latest_idx, 'take_profit'] = take_profit
                 df.loc[latest_idx, 'signal_type'] = 'mean_reversion_buy'
-                df.loc[latest_idx, 'scalp_confidence'] = 0.7
+                df.loc[latest_idx, 'scalp_confidence'] = 0.75
             
             # Overbought drop scalp
-            elif (rsi > 75 and stoch_k > 80 and bb_position > 0.9 and 
+            elif (rsi > 70 and stoch_k > 75 and bb_position > 0.85 and 
                   latest['close'] < latest['high']):
                 
                 entry_price = latest['close']
-                stop_loss = entry_price + (self.sl_pips * 0.0001)
-                take_profit = entry_price - (self.tp_pips * 0.0001)
+                stop_loss = entry_price + sl_dist
+                take_profit = entry_price - tp_dist
                 
                 df.loc[latest_idx, 'signal'] = -1
                 df.loc[latest_idx, 'entry_price'] = entry_price
                 df.loc[latest_idx, 'stop_loss'] = stop_loss
                 df.loc[latest_idx, 'take_profit'] = take_profit
                 df.loc[latest_idx, 'signal_type'] = 'mean_reversion_sell'
-                df.loc[latest_idx, 'scalp_confidence'] = 0.7
+                df.loc[latest_idx, 'scalp_confidence'] = 0.75
                 
         except Exception as e:
             logger.error(f"Error in mean reversion scalping: {e}")
