@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useConfigStore } from '../store/configStore';
+import { useAccountStore } from '../store/accountStore';
+import { getCurrencySymbol } from '../utils/formatters';
 import { getMT5Symbols } from '../api/tradingApi';
 import { SymbolCard } from '../components/SymbolCard';
-import { Save, RotateCcw, AlertTriangle, Shield, Sliders, Clock, Radio, CheckCircle, Database, Plus, Search } from 'lucide-react';
+import { Save, RotateCcw, AlertTriangle, Shield, Sliders, Clock, Radio, CheckCircle, Database, Plus, Search, Globe, Zap, ArrowDownCircle } from 'lucide-react';
 
 export const Configuration = () => {
   const config = useConfigStore((state) => state.config);
@@ -17,8 +19,12 @@ export const Configuration = () => {
   const saveConfiguration = useConfigStore((state) => state.saveConfiguration);
   const resetChanges = useConfigStore((state) => state.resetChanges);
 
+  const currency = useAccountStore((state) => state.account?.currency || 'USD');
+  const currSym = getCurrencySymbol(currency);
+
   const [mt5Symbols, setMt5Symbols] = useState([]);
   const [selectedAddSymbol, setSelectedAddSymbol] = useState('');
+  const [appliedGlobalToast, setAppliedGlobalToast] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -57,17 +63,43 @@ export const Configuration = () => {
   const strategyMode = config.STRATEGY_MODE || 'mcp_enhanced';
   const symbols = config.SYMBOLS || {};
 
+  const handleApplyGlobalRiskToAllPairs = () => {
+    const globalRisk = config.RISK_MANAGEMENT || {};
+    const updatedSymbols = { ...symbols };
+
+    const gRiskPct = globalRisk.global_risk_percent ?? 1.0;
+    const gFixedLot = globalRisk.global_fixed_lot_size ?? null;
+    const gMaxRiskAmt = globalRisk.global_max_risk_amount ?? null;
+    const gMaxLot = globalRisk.global_max_lot_size ?? 0.10;
+
+    Object.keys(updatedSymbols).forEach((sym) => {
+      updatedSymbols[sym] = {
+        ...updatedSymbols[sym],
+        risk_percent: gRiskPct,
+        fixed_lot_size: gFixedLot,
+        max_risk_amount: gMaxRiskAmt,
+        max_lot_size: gMaxLot,
+      };
+    });
+
+    updateField('SYMBOLS', updatedSymbols);
+    setAppliedGlobalToast(true);
+    setTimeout(() => setAppliedGlobalToast(false), 3500);
+  };
+
   const handleAddSymbol = (symName) => {
     if (!symName) return;
     if (symbols[symName]) return;
 
     const defaultSettings = {
       enabled: true,
-      risk_percent: 1.0,
+      risk_percent: config.RISK_MANAGEMENT?.global_risk_percent || 1.0,
       tp_ratio: 2.0,
       max_trades: 1,
       min_rr_ratio: 1.0,
-      fixed_lot_size: null,
+      fixed_lot_size: config.RISK_MANAGEMENT?.global_fixed_lot_size || null,
+      max_risk_amount: config.RISK_MANAGEMENT?.global_max_risk_amount || null,
+      max_lot_size: config.RISK_MANAGEMENT?.global_max_lot_size || 0.10,
       trailing_settings: {
         start_ratio: 0.8,
         trail_step: 0.2,
@@ -118,76 +150,183 @@ export const Configuration = () => {
       {/* Section 3.5 — Strategy Selection Mode */}
       <div className="bg-cardBg border border-borderColor p-5 rounded-2xl space-y-3 shadow-lg">
         <h3 className="font-bold text-white text-sm flex items-center gap-2">
-          <Radio size={18} className="text-accentBlue" /> Strategy Execution Mode
+          <Sliders size={16} className="text-accentBlue" /> 3.5 AI Trading Strategy Mode
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <p className="text-gray-400 text-xs">
+          Select the active execution engine driving trading signals across all loaded symbols.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
           {[
-            { id: 'pde', label: 'PDE Strategy (New)', desc: 'Premium / Discount / Equilibrium Zones (+235.1% 5Y Backtest)' },
-            { id: 'mcp_enhanced', label: 'MCP Enhanced', desc: 'MT5 orderbook depth + spread ATR + correlation risk + AI' },
-            { id: 'standard_ai', label: 'Standard AI', desc: 'Multi-timeframe SMC + 14-feature RandomForest model' },
-            { id: 'scalping', label: 'Scalping', desc: 'Fast 1M/5M scalping mode' },
-          ].map((mode) => (
-            <div
-              key={mode.id}
-              onClick={() => updateField('STRATEGY_MODE', mode.id)}
-              className={`p-4 rounded-xl border cursor-pointer transition ${
-                strategyMode === mode.id
-                  ? 'bg-accentBlue/10 border-accentBlue text-white shadow-md'
-                  : 'bg-darkBg border-borderColor/60 text-gray-400 hover:border-borderColor'
-              }`}
-            >
-              <div className="font-bold text-sm text-white mb-1">{mode.label}</div>
-              <div className="text-xs text-gray-400">{mode.desc}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Section 3.6 — Primary Timeframe Selection */}
-      <div className="bg-cardBg border border-borderColor p-5 rounded-2xl space-y-3 shadow-lg">
-        <h3 className="font-bold text-white text-sm flex items-center gap-2">
-          <Clock size={18} className="text-accentBlue" /> Primary Trading Timeframe
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { id: '5m', label: '5 Minutes (5M)', desc: 'High-frequency scalping (+568,272% 5Y backtest)' },
-            { id: '15m', label: '15 Minutes (15M)', desc: 'Intraday scalping (+5,368% 5Y backtest)' },
-            { id: '1h', label: '1 Hour (1H)', desc: 'Macro swing trading (+235% 5Y backtest)' },
-            { id: '4h', label: '4 Hours (4H)', desc: 'Long-term trend confirmation' },
-          ].map((tf) => {
-            const currentTf = config.TIMEFRAMES?.primary || '5m';
+            { id: 'pde', title: 'PDE (Premium / Discount Engine)', desc: 'Institutional SMC value area targeting 70% Value Area + daily sessions.' },
+            { id: 'mcp_enhanced', title: 'DeepSeek MCP Enhanced', desc: 'Combines dynamic order blocks, FVG liquidity, and deep reasoning.' },
+            { id: 'volume_profile', title: 'Volume Profile & POC Migration', desc: 'Executes strictly around high-volume Point of Control rejections.' },
+            { id: 'scalping', title: 'High-Frequency M1 Scalping', desc: 'Precision rapid executions off microstructure orderflow breaks.' },
+          ].map((mode) => {
+            const isCurrent = (strategyMode === mode.id);
             return (
               <div
-                key={tf.id}
-                onClick={() => {
-                  updateField('TIMEFRAMES.primary', tf.id);
-                  updateField('PDE_SETTINGS.timeframe', tf.id);
-                }}
-                className={`p-4 rounded-xl border cursor-pointer transition ${
-                  currentTf === tf.id
-                    ? 'bg-accentBlue/10 border-accentBlue text-white shadow-md'
-                    : 'bg-darkBg border-borderColor/60 text-gray-400 hover:border-borderColor'
+                key={mode.id}
+                onClick={() => updateField('STRATEGY_MODE', mode.id)}
+                className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                  isCurrent
+                    ? 'border-accentBlue bg-accentBlue/10 shadow-md ring-1 ring-accentBlue'
+                    : 'border-borderColor bg-darkBg hover:border-gray-600'
                 }`}
               >
-                <div className="font-bold text-sm text-white mb-1 flex items-center justify-between">
-                  {tf.label}
-                  {currentTf === tf.id && (
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`font-bold text-xs ${isCurrent ? 'text-accentBlue' : 'text-white'}`}>
+                    {mode.title}
+                  </span>
+                  {isCurrent && (
                     <span className="text-[10px] font-bold bg-accentBlue text-white px-2 py-0.5 rounded-full">ACTIVE</span>
                   )}
                 </div>
-                <div className="text-xs text-gray-400">{tf.desc}</div>
+                <div className="text-xs text-gray-400">{mode.desc}</div>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Section 3.2 — Symbol Configuration & Risk Setup */}
+      {/* 🌐 Master Global Risk Management (Across All Pairs) */}
+      <div className="bg-gradient-to-r from-cardBg via-cardBg to-darkBg border border-accentBlue/40 p-5 rounded-2xl space-y-4 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-borderColor/60 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-accentBlue/20 text-accentBlue rounded-xl border border-accentBlue/30">
+              <Globe size={20} />
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-base flex items-center gap-2">
+                Global Risk Policy Across All Pairs
+              </h3>
+              <span className="text-xs text-gray-400">
+                Master risk parameters applied across all {Object.keys(symbols).length} symbols (Account Currency: <span className="text-white font-semibold">{currSym} {currency}</span>)
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {appliedGlobalToast && (
+              <span className="text-xs font-bold text-accentGreen flex items-center gap-1 bg-accentGreen/20 px-3 py-1.5 rounded-xl border border-accentGreen/30 animate-pulse">
+                <CheckCircle size={14} /> Applied to All {Object.keys(symbols).length} Pairs!
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleApplyGlobalRiskToAllPairs}
+              className="px-4 py-2 bg-accentBlue hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-lg hover:shadow-accentBlue/20 active:scale-95"
+            >
+              <Zap size={14} /> Apply Global Risk to All Pairs
+            </button>
+          </div>
+        </div>
+
+        {/* Global Controls Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+          {/* Global Risk % */}
+          <div className="bg-darkBg/80 border border-borderColor p-3 rounded-xl space-y-2">
+            <div className="flex justify-between items-center text-gray-300">
+              <span className="font-semibold">Global Risk %:</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min="0.1"
+                  max="50.0"
+                  step="0.1"
+                  value={config.RISK_MANAGEMENT?.global_risk_percent ?? 1.0}
+                  onChange={(e) => updateField('RISK_MANAGEMENT.global_risk_percent', Math.min(50.0, Math.max(0.1, parseFloat(e.target.value) || 0.1)))}
+                  className="w-16 bg-cardBg border border-borderColor rounded px-1.5 py-0.5 text-right font-bold text-accentBlue font-mono text-xs"
+                />
+                <span className="text-white font-bold">%</span>
+              </div>
+            </div>
+            <input
+              type="range"
+              min="0.1"
+              max="50.0"
+              step="0.5"
+              value={config.RISK_MANAGEMENT?.global_risk_percent ?? 1.0}
+              onChange={(e) => updateField('RISK_MANAGEMENT.global_risk_percent', parseFloat(e.target.value))}
+              className="w-full accent-accentBlue"
+            />
+          </div>
+
+          {/* Global Fixed Risk Amount */}
+          <div className="bg-darkBg/80 border border-borderColor p-3 rounded-xl space-y-2">
+            <div className="flex justify-between items-center text-gray-300">
+              <span className="font-semibold">Global Risk Amount:</span>
+              <span className="text-gray-400 text-[11px]">{currSym} {currency}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="50"
+                placeholder={currency === 'INR' ? 'e.g. 2000' : 'e.g. 50'}
+                value={config.RISK_MANAGEMENT?.global_max_risk_amount ?? ''}
+                onChange={(e) => updateField('RISK_MANAGEMENT.global_max_risk_amount', e.target.value ? parseFloat(e.target.value) : null)}
+                className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => updateField('RISK_MANAGEMENT.global_max_risk_amount', config.RISK_MANAGEMENT?.global_max_risk_amount ? null : (currency === 'INR' ? 2000 : 50))}
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition ${config.RISK_MANAGEMENT?.global_max_risk_amount ? 'bg-emerald-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+              >
+                {config.RISK_MANAGEMENT?.global_max_risk_amount ? 'Active' : 'Set Cap'}
+              </button>
+            </div>
+          </div>
+
+          {/* Global Fixed Lot Size */}
+          <div className="bg-darkBg/80 border border-borderColor p-3 rounded-xl space-y-2">
+            <div className="flex justify-between items-center text-gray-300">
+              <span className="font-semibold">Global Fixed Lot:</span>
+              <span className="text-gray-400 text-[11px]">Micro-Lot</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.01"
+                placeholder="e.g. 0.02"
+                value={config.RISK_MANAGEMENT?.global_fixed_lot_size ?? ''}
+                onChange={(e) => updateField('RISK_MANAGEMENT.global_fixed_lot_size', e.target.value ? parseFloat(e.target.value) : null)}
+                className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => updateField('RISK_MANAGEMENT.global_fixed_lot_size', config.RISK_MANAGEMENT?.global_fixed_lot_size ? null : 0.02)}
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition ${config.RISK_MANAGEMENT?.global_fixed_lot_size ? 'bg-accentBlue text-white' : 'bg-gray-700 text-gray-300'}`}
+              >
+                {config.RISK_MANAGEMENT?.global_fixed_lot_size ? 'Locked' : 'Use %'}
+              </button>
+            </div>
+          </div>
+
+          {/* Global Max Lot Cap */}
+          <div className="bg-darkBg/80 border border-borderColor p-3 rounded-xl space-y-2">
+            <div className="flex justify-between items-center text-gray-300">
+              <span className="font-semibold">Global Max Lot Cap:</span>
+              <span className="text-accentRed font-mono font-bold text-[11px]">Hard Ceiling</span>
+            </div>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              max="5.0"
+              value={config.RISK_MANAGEMENT?.global_max_lot_size ?? 0.10}
+              onChange={(e) => updateField('RISK_MANAGEMENT.global_max_lot_size', parseFloat(e.target.value) || 0.10)}
+              className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono text-xs"
+              placeholder="e.g. 0.10"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Section 3.2 — Symbol Configuration & Individual Risk Setup */}
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="font-bold text-white text-sm">3.2 Symbol Configuration & Risk Setup</h3>
-            <span className="text-xs text-gray-400">Default 4 core symbols + dynamic MT5 symbol picker ({mt5Symbols.length} available)</span>
+            <h3 className="font-bold text-white text-sm">3.2 Symbol Configuration & Individual Overrides</h3>
+            <span className="text-xs text-gray-400">Default core symbols + dynamic MT5 symbol picker ({mt5Symbols.length} available)</span>
           </div>
 
           {/* MT5 Dynamic Symbol Picker Dropdown */}

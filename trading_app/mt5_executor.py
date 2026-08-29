@@ -257,18 +257,20 @@ class MT5Executor:
         """
         try:
             symbol_config = config.SYMBOLS.get(symbol, {})
+            global_risk_cfg = getattr(config, 'RISK_MANAGEMENT', {}) or {}
             account_currency = self.get_account_currency()
-            fixed_lot_size = symbol_config.get('fixed_lot_size') or symbol_config.get('lot_size')
-            max_money_risk = symbol_config.get('max_risk_amount')
+            
+            fixed_lot_size = symbol_config.get('fixed_lot_size') or symbol_config.get('lot_size') or global_risk_cfg.get('global_fixed_lot_size')
+            max_money_risk = symbol_config.get('max_risk_amount') if symbol_config.get('max_risk_amount') is not None else global_risk_cfg.get('global_max_risk_amount')
             
             # 1. CALCULATE BASE RISK AMOUNT IN ACCOUNT CURRENCY
             if max_money_risk is not None and float(max_money_risk) > 0:
                 risk_amount_acc = float(max_money_risk)
                 logger.info(f"[{symbol}] Using Money Risk Limit: {risk_amount_acc:.2f} {account_currency}")
             else:
-                base_risk_percent = float(symbol_config.get('risk_percent', 1.0))
+                base_risk_percent = float(symbol_config.get('risk_percent') if symbol_config.get('risk_percent') is not None else global_risk_cfg.get('global_risk_percent', 1.0) or 1.0)
                 risk_amount_acc = account_balance * (base_risk_percent / 100.0)
-                logger.info(f"[{symbol}] Using Dynamic Risk {base_risk_percent}% of {account_balance:.2f} {account_currency} = {risk_amount_acc:.2f} {account_currency}")
+                logger.info(f"[{symbol}] Using Risk {base_risk_percent}% of {account_balance:.2f} {account_currency} = {risk_amount_acc:.2f} {account_currency}")
 
             # 2. CONVERT RISK AMOUNT TO USD (Since Gold/Forex contracts are USD-based)
             usd_rate = self.get_usd_conversion_rate(account_currency)
@@ -335,7 +337,7 @@ class MT5Executor:
             position_size = max(volume_min, round(position_size / volume_step) * volume_step)
             
             # Hard-cap safety limits (default max 0.10 lots per position unless user configured higher)
-            max_allowed_lot = float(symbol_config.get('max_lot_size', 0.10) or 0.10)
+            max_allowed_lot = float(symbol_config.get('max_lot_size') or global_risk_cfg.get('global_max_lot_size') or 0.10)
             final_position_size = min(position_size, max_allowed_lot)
 
             logger.info(
