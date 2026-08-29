@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Shield, Zap, Sliders, Trash2 } from 'lucide-react';
+import { useAccountStore } from '../store/accountStore';
+import { getCurrencySymbol } from '../utils/formatters';
+import { ChevronDown, ChevronUp, Shield, Zap, Sliders, Trash2, DollarSign } from 'lucide-react';
 
 const symbolColors = {
   XAUUSDm: { text: 'text-amber-400', border: 'border-amber-500/40', badge: 'bg-amber-500/10 text-amber-400' },
@@ -13,6 +15,8 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
   const color = symbolColors[symbol] || { text: 'text-purple-400', border: 'border-purple-500/40', badge: 'bg-purple-500/10 text-purple-400' };
 
   const isEnabled = data?.enabled ?? false;
+  const currency = useAccountStore((state) => state.account?.currency || 'USD');
+  const currSym = getCurrencySymbol(currency);
 
   const handleToggleEnable = (e) => {
     e.stopPropagation();
@@ -70,9 +74,9 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
           {/* Risk & Sizing */}
           <div>
             <h4 className="font-semibold text-gray-300 mb-3 flex items-center gap-1.5">
-              <Shield size={14} className="text-accentBlue" /> Risk & Position Sizing
+              <Shield size={14} className="text-accentBlue" /> Risk & Position Sizing (Account: {currency})
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <label className="block text-gray-400 mb-1">Risk per Trade: <span className="text-white font-semibold">{data?.risk_percent}%</span></label>
                 <input
@@ -128,6 +132,20 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
               </div>
 
               <div>
+                <label className="block text-gray-400 mb-1">Max Lot Cap (Hard Ceiling)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max="1.0"
+                  value={data?.max_lot_size || 0.10}
+                  onChange={(e) => onChange(`SYMBOLS.${symbol}.max_lot_size`, parseFloat(e.target.value) || 0.10)}
+                  className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono"
+                  placeholder="e.g. 0.05 or 0.10"
+                />
+              </div>
+
+              <div>
                 <label className="block text-gray-400 mb-1">Max Simultaneous Trades</label>
                 <input
                   type="number"
@@ -135,32 +153,37 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
                   max="5"
                   value={data?.max_trades || 1}
                   onChange={(e) => onChange(`SYMBOLS.${symbol}.max_trades`, parseInt(e.target.value))}
-                  className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white"
+                  className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono"
                 />
               </div>
             </div>
 
             {/* Fixed Lot Size Option */}
-            <div className="mt-3 flex items-center justify-between bg-cardBg p-2.5 rounded-xl border border-borderColor">
-              <span className="text-gray-300">
-                Fixed Lot Size: <span className="text-gray-400">{data?.fixed_lot_size !== null && data?.fixed_lot_size !== undefined ? `${data.fixed_lot_size} lots` : 'Dynamic (based on risk %)'}</span>
-              </span>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 bg-cardBg p-3 rounded-xl border border-borderColor">
+              <div>
+                <span className="text-gray-200 font-semibold block">Fixed Micro-Lot Override:</span>
+                <span className="text-gray-400 text-[11px]">
+                  {data?.fixed_lot_size !== null && data?.fixed_lot_size !== undefined 
+                    ? `Locked at ${data.fixed_lot_size} lots per trade` 
+                    : `Using dynamic sizing based on ${data?.risk_percent || 1}% of ${currency} balance`}
+                </span>
+              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   step="0.01"
-                  placeholder="0.01"
+                  placeholder="0.02"
                   disabled={data?.fixed_lot_size === null}
                   value={data?.fixed_lot_size ?? ''}
                   onChange={(e) => onChange(`SYMBOLS.${symbol}.fixed_lot_size`, parseFloat(e.target.value) || 0.01)}
-                  className="w-24 bg-darkBg border border-borderColor rounded-lg px-2 py-1 text-white disabled:opacity-50"
+                  className="w-24 bg-darkBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono disabled:opacity-40"
                 />
                 <button
                   type="button"
-                  onClick={() => onChange(`SYMBOLS.${symbol}.fixed_lot_size`, data?.fixed_lot_size === null ? 0.01 : null)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${data?.fixed_lot_size === null ? 'bg-accentBlue text-white' : 'bg-gray-700 text-gray-300'}`}
+                  onClick={() => onChange(`SYMBOLS.${symbol}.fixed_lot_size`, data?.fixed_lot_size === null ? 0.02 : null)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${data?.fixed_lot_size === null ? 'bg-accentBlue text-white shadow' : 'bg-gray-700 text-gray-300'}`}
                 >
-                  {data?.fixed_lot_size === null ? 'Enable Fixed' : 'Use Dynamic'}
+                  {data?.fixed_lot_size === null ? 'Lock Fixed Lots' : 'Use Dynamic %'}
                 </button>
               </div>
             </div>

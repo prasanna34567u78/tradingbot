@@ -999,12 +999,16 @@ class GoldTradingBot:
                     logger.error(f"Failed to get account balance for {symbol}")
                     return
                     
-                position_size = executor.calculate_dynamic_position_size(
-                    symbol,
-                    account_balance,
-                    high_quality_signal['entry_price'],
-                    high_quality_signal['stop_loss']
-                )
+                fixed_lot = symbol_config.get('fixed_lot_size') or symbol_config.get('lot_size')
+                if fixed_lot and float(fixed_lot) > 0:
+                    position_size = float(fixed_lot)
+                else:
+                    position_size = executor.calculate_dynamic_position_size(
+                        symbol,
+                        account_balance,
+                        high_quality_signal['entry_price'],
+                        high_quality_signal['stop_loss']
+                    )
                 
                 # Execute the trade with enhanced logging
                 logger.info(f"[EXECUTING] {symbol} {signal_type} TRADE:")

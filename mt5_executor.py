@@ -200,114 +200,147 @@ class MT5Executor:
             logger.error(f"Error checking correlation risk: {str(e)}")
             return True  # Allow trade if check fails
     
+    def get_account_currency(self) -> str:
+        """Fetch base account currency from MT5 (e.g. 'INR', 'USD', 'EUR', 'GBP')"""
+        try:
+            acc = mt5.account_info()
+            if acc and hasattr(acc, 'currency') and acc.currency:
+                return str(acc.currency).upper().strip()
+        except Exception:
+            pass
+        return "USD"
+
+    def get_usd_conversion_rate(self, account_currency: str) -> float:
+        """
+        Get exchange rate to convert 1 USD to account currency.
+        e.g., if currency is INR, returns ~87.0 (87 INR = 1 USD).
+        """
+        c = (account_currency or "USD").upper().strip()
+        if c in ["USD", "USDT"]:
+            return 1.0
+        
+        # Check MT5 ticker if available
+        try:
+            for pair in [f"USD{c}", f"USD{c}m", f"{c}USD", f"{c}USDm"]:
+                tick = mt5.symbol_info_tick(pair)
+                if tick and tick.bid > 0:
+                    if pair.startswith("USD"):
+                        return float(tick.bid)
+                    else:
+                        return 1.0 / float(tick.bid)
+        except Exception:
+            pass
+
+        # Fallback static exchange rates
+        fallbacks = {
+            "INR": 87.0,
+            "RS": 87.0,
+            "RUPEES": 87.0,
+            "EUR": 0.92,
+            "GBP": 0.78,
+            "AED": 3.67,
+            "JPY": 155.0,
+            "CAD": 1.36,
+            "AUD": 1.52,
+        }
+        return fallbacks.get(c, 1.0)
+
     def calculate_dynamic_position_size(self, symbol, account_balance, entry_price, stop_loss):
         """
-        Calculate position size with enhanced risk management
-        Supports both fixed lot size and dynamic risk-based sizing
+        Calculate position size with multi-currency risk management.
+        Supports:
+          1. Fixed Lot Size (Highest priority: e.g. 0.02 lots)
+          2. Fixed Risk Amount in Account Currency (e.g. ₹500 INR or $50 USD)
+          3. Dynamic Risk % of Balance (e.g. 1.0%)
+          4. Currency normalization for INR/EUR/GBP accounts
+          5. Hard Safety Max Lot Cap (default 0.10 lots)
         """
         try:
             symbol_config = config.SYMBOLS.get(symbol, {})
             
-            # Check if fixed lot size is configured for this symbol
-            fixed_lot_size = symbol_config.get('fixed_lot_size')
-            if fixed_lot_size is not None:
-                logger.info(f"Using fixed lot size for {symbol}: {fixed_lot_size}")
+            # 1. FIXED LOT SIZE (Explicit user micro-lot override)
+            fixed_lot_size = symbol_config.get('fixed_lot_size') or symbol_config.get('lot_size')
+            if fixed_lot_size is not None and float(fixed_lot_size) > 0:
+                logger.info(f"[{symbol}] Using FIXED Lot Size: {float(fixed_lot_size):.2f} lots")
                 return float(fixed_lot_size)
             
-            # Continue with dynamic calculation
-            logger.info(f"Using dynamic position sizing for {symbol}")
-            base_risk_percent = symbol_config.get('risk_percent', 1.0)
+            # 2. CALCULATE BASE RISK AMOUNT IN ACCOUNT CURRENCY
+            account_currency = self.get_account_currency()
+            max_money_risk = symbol_config.get('max_risk_amount')
             
+            if max_money_risk is not None and float(max_money_risk) > 0:
+                risk_amount_acc = float(max_money_risk)
+                logger.info(f"[{symbol}] Using FIXED Money Risk: {risk_amount_acc:.2f} {account_currency}")
+            else:
+                base_risk_percent = float(symbol_config.get('risk_percent', 1.0))
+                risk_amount_acc = account_balance * (base_risk_percent / 100.0)
+                logger.info(f"[{symbol}] Using Dynamic Risk {base_risk_percent}% of {account_balance:.2f} {account_currency} = {risk_amount_acc:.2f} {account_currency}")
+
+            # 3. CONVERT RISK AMOUNT TO USD (Since Gold/Forex contracts are USD-based)
+            usd_rate = self.get_usd_conversion_rate(account_currency)
+            risk_amount_usd = risk_amount_acc / usd_rate
+            
+            price_diff = abs(entry_price - stop_loss)
+            if price_diff == 0:
+                logger.error(f"[{symbol}] Invalid stop loss distance (0.00) - same as entry price")
+                return 0.01
+
             # Get symbol specifications
             symbol_spec = self.symbol_info.get(symbol, {})
-            point = symbol_spec.get('point', 0.00001)
+            point = symbol_spec.get('point', 0.001)
             volume_min = symbol_spec.get('volume_min', 0.01)
             volume_step = symbol_spec.get('volume_step', 0.01)
-            
-            # Calculate base position size
-            risk_amount = account_balance * (base_risk_percent / 100)
-            price_diff = abs(entry_price - stop_loss)
-            
-            if price_diff == 0:
-                logger.error("Invalid stop loss - same as entry price")
-                return volume_min
-            
-            # Calculate position size properly for different symbol types
-            if 'USD' in symbol and symbol.endswith('m'):
-                # For forex pairs (like EURUSDm), calculate proper lot size
-                # Standard lot for forex is 100,000 units of base currency
-                # Pip value for most major pairs = (0.0001 / quote_currency_rate) * lot_size
-                pip_value = 10  # Simplified: $10 per pip for 1 standard lot on major pairs
-                stop_loss_pips = price_diff / point
-                
-                if stop_loss_pips > 0:
-                    position_size = risk_amount / (stop_loss_pips * pip_value)
-                else:
-                    position_size = volume_min
-                    
-            elif 'XAU' in symbol or 'GOLD' in symbol.upper():
-                # For gold (XAUUSD), pip value is different
-                # 1 lot = 100 oz, 1 pip = $0.01 per oz = $1 per lot
-                pip_value = 1  # $1 per pip for 1 lot of gold
-                stop_loss_pips = price_diff / point
-                
-                if stop_loss_pips > 0:
-                    position_size = risk_amount / (stop_loss_pips * pip_value)
-                else:
-                    position_size = volume_min
-                    
+
+            # 4. PRECISE LOT CALCULATION BY ASSET CLASS
+            if 'XAU' in symbol or 'GOLD' in symbol.upper():
+                # Gold: 1 Lot = 100 oz -> $1.00 move = $100 USD
+                # Lots = USD Risk Amount / (Points difference * 100)
+                position_size = risk_amount_usd / (price_diff * 100.0)
             elif 'BTC' in symbol:
-                # For crypto, use simpler calculation
-                contract_size = 1  # 1 lot = 1 BTC typically
-                position_size = risk_amount / (price_diff * contract_size)
-                
+                # BTC: 1 Lot = 1 BTC -> $1.00 move = $1.00 USD
+                position_size = risk_amount_usd / price_diff
+            elif 'USD' in symbol and symbol.endswith('m'):
+                # Forex: 1 Standard Lot = 100,000 units -> $10/pip
+                pip_value = 10.0
+                stop_loss_pips = price_diff / (point * 10.0)
+                position_size = risk_amount_usd / (max(stop_loss_pips, 1.0) * pip_value)
             else:
-                # Generic calculation for other instruments
-                # Use conservative approach
-                position_size = risk_amount / (price_diff * 10)
-            
-            # Apply volatility adjustment if enabled
+                # Generic asset
+                position_size = risk_amount_usd / (price_diff * 100.0)
+
+            # 5. VOLATILITY ADJUSTMENT
             if symbol_config.get('volatility_adj', False):
                 try:
-                    # Get recent volatility
                     df = self.fetch_historical_data_mt5_symbol(symbol, '1h', 24)
                     if df is not None and len(df) > 20:
                         atr = df['high'].subtract(df['low']).rolling(14).mean().iloc[-1]
                         avg_atr = df['high'].subtract(df['low']).rolling(50).mean().iloc[-1]
-                        
                         if avg_atr > 0:
-                            volatility_ratio = atr / avg_atr
-                            # Reduce position size in high volatility
-                            if volatility_ratio > 1.5:
-                                position_size *= 0.7
-                                logger.info(f"Reduced position size due to high volatility: {volatility_ratio:.2f}")
-                            elif volatility_ratio < 0.7:
-                                position_size *= 1.2
-                                logger.info(f"Increased position size due to low volatility: {volatility_ratio:.2f}")
+                            vol_ratio = atr / avg_atr
+                            if vol_ratio > 1.5:
+                                position_size *= 0.75
+                            elif vol_ratio < 0.7:
+                                position_size *= 1.15
                 except Exception as e:
-                    logger.error(f"Error in volatility adjustment: {str(e)}")
-            
-            # Round to valid volume step
+                    logger.error(f"Error in volatility adjustment: {e}")
+
+            # 6. ROUNDING & HARD SAFETY LOT CEILING
             position_size = max(volume_min, round(position_size / volume_step) * volume_step)
             
-            # Apply conservative maximum limits based on account balance
-            conservative_max = account_balance / 10000  # Max position = 1% of account value
+            # Hard-cap safety limits (default max 0.10 lots per position unless user configured higher)
+            max_allowed_lot = float(symbol_config.get('max_lot_size', 0.10) or 0.10)
+            final_position_size = min(position_size, max_allowed_lot)
+
+            logger.info(
+                f"[{symbol}] Position Sized: {final_position_size:.2f} lots "
+                f"(Risk: {risk_amount_acc:.2f} {account_currency} / ${risk_amount_usd:.2f} USD | "
+                f"SL Distance: {price_diff:.3f} pts | Max Cap: {max_allowed_lot:.2f} lots)"
+            )
+            return round(final_position_size, 2)
             
-            # Check broker maximum volume
-            volume_max = symbol_spec.get('volume_max', 100.0)
-            
-            # Apply the most restrictive limit
-            final_max = min(volume_max, conservative_max, 10.0)  # Never exceed 10 lots
-            position_size = min(position_size, final_max)
-            
-            # Additional safety check - never risk more than account can handle
-            if position_size * entry_price > account_balance * 0.1:  # Never use more than 10% of account
-                position_size = (account_balance * 0.1) / entry_price
-                position_size = max(volume_min, round(position_size / volume_step) * volume_step)
-            
-            logger.info(f"Calculated position size for {symbol}: {position_size} (Risk: {risk_amount:.2f}, "
-                       f"Stop distance: {price_diff:.5f}, Conservative max: {conservative_max:.2f})")
-            return position_size
+        except Exception as e:
+            logger.error(f"Error calculating position size: {str(e)}")
+            return 0.01
             
         except Exception as e:
             logger.error(f"Error calculating position size: {str(e)}")
