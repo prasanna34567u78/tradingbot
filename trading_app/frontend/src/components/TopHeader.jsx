@@ -104,13 +104,18 @@ export const TopHeader = ({ onOpenGemini, onToggleMobileMenu }) => {
             <Menu size={22} />
           </button>
 
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 sm:p-2 bg-accentGreen/10 rounded-lg text-accentGreen border border-accentGreen/20">
-              <Cpu size={18} className="sm:w-[22px] sm:h-[22px]" />
-            </div>
+          <div className="flex items-center gap-2.5">
+            <img 
+              src="/quantbotlogo.png" 
+              alt="QuantBot AI Logo" 
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain shadow-md border border-borderColor/40 bg-darkBg/60 p-0.5"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
             <div>
-              <h1 className="font-bold text-sm sm:text-lg text-white leading-tight">TradeBot</h1>
-              <div className="text-[9px] sm:text-[11px] text-gray-400 font-mono hidden sm:block">Exness MT5 Engine</div>
+              <h1 className="font-bold text-sm sm:text-base text-white leading-tight flex items-center gap-1.5">
+                QuantBot <span className="text-accentBlue font-black text-xs px-1.5 py-0.2 bg-accentBlue/10 border border-accentBlue/30 rounded">AI</span>
+              </h1>
+              <div className="text-[9px] sm:text-[10px] text-gray-400 font-mono hidden sm:block">@quantbot_ai • Exness MT5</div>
             </div>
           </div>
 

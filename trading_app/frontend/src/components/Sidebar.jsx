@@ -39,9 +39,17 @@ export const Sidebar = ({ activePage, setActivePage, isMobileOpen, setIsMobileOp
       }`}>
         <div>
           <div className="p-4 border-b border-borderColor flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-base text-white">TradeBot AI</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-accentGreen/10 text-accentGreen border border-accentGreen/30">v2.6</span>
+            <div className="flex items-center gap-2.5">
+              <img 
+                src="/quantbotlogo.png" 
+                alt="QuantBot AI" 
+                className="w-7 h-7 rounded-lg object-contain border border-borderColor/40 bg-darkBg/60"
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+              <div>
+                <span className="font-bold text-sm text-white">QuantBot AI</span>
+                <span className="text-[10px] ml-1.5 px-1.5 py-0.5 rounded bg-accentBlue/10 text-accentBlue border border-accentBlue/30">v2.6</span>
+              </div>
             </div>
             <button 
               onClick={() => setIsMobileOpen(false)}
@@ -121,9 +129,17 @@ export const Sidebar = ({ activePage, setActivePage, isMobileOpen, setIsMobileOp
         </div>
 
         {!collapsed && (
-          <div className="p-4 border-t border-borderColor text-xs text-gray-500">
-            <div>TradeBot AI v2.6</div>
-            <div>Status: <span className="text-accentGreen font-semibold">Online</span></div>
+          <div className="p-3 border-t border-borderColor text-xs text-gray-500 bg-darkBg/30 flex items-center gap-2">
+            <img 
+              src="/quantbotlogo.png" 
+              alt="QuantBot" 
+              className="w-5 h-5 rounded object-contain"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+            <div>
+              <div className="font-semibold text-gray-300">QuantBot AI</div>
+              <div className="text-[10px] text-gray-500">@quantbot_ai</div>
+            </div>
           </div>
         )}
       </aside>
