@@ -592,26 +592,24 @@ class GoldTradingBot:
                           f"Current SL: {trade_info['stop_loss']}, "
                           f"Profit: {profit_display}")
                 
-                # Check if we should exit based on market conditions (Exempt PDE strategy to let it reach structural zones)
-                is_pde = (
-                    getattr(config, 'STRATEGY_MODE', '').lower() == 'pde' or
+                # Check if we should exit based on market conditions (Exempt PDE & Scalping to let TP/SL/Trailing do their jobs)
+                is_pde_or_scalp = (
+                    getattr(config, 'STRATEGY_MODE', '').lower() in ['pde', 'scalping'] or
                     'pde' in str(trade_info.get('comment', '')).lower() or
-                    'pde' in str(trade_info.get('signal_type', '')).lower() or
-                    getattr(strategy, 'is_pde', False) or
-                    'pde' in str(type(strategy)).lower()
+                    'scalp' in str(trade_info.get('comment', '')).lower() or
+                    getattr(strategy, 'is_pde', False)
                 )
                 should_exit = False
-                if not is_pde:
-                    should_exit = (
-                        strategy.should_exit_trade(df) or
-                        (validation.get('market_conditions', {}).get('risk_level') == 'high' and 
-                         validation.get('confidence', 1.0) < 0.4)
-                    )
+                if not is_pde_or_scalp:
+                    # Require trade to be held for at least 3 bars before market exit
+                    bars_held = trade_info.get('bars_held', 0)
+                    if bars_held >= 3:
+                        should_exit = strategy.should_exit_trade(df)
                 
                 if should_exit:
-                    logger.info(f"{symbol} - Market conditions indicate exit")
+                    logger.info(f"{symbol} - Market conditions indicate structural exit")
                     position_size = trade_info.get('volume', None)
-                    if position_size and executor.close_trade(trade_id, position_size, "AI/Market Exit"):
+                    if position_size and executor.close_trade(trade_id, position_size, "Structural Exit"):
                         exit_price = current_price['bid'] if trade_info['side'] == 'buy' else current_price['ask']
                         self._log_trade_result(trade_info, exit_price, df, symbol)
                         

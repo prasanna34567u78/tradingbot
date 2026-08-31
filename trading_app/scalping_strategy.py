@@ -457,22 +457,27 @@ class ScalpingStrategy:
             return None
     
     def _should_exit_scalp_early(self, df, side):
-        """Check if we should exit scalping trade early due to reversal signals"""
+        """
+        Check if we should exit scalping trade early.
+        Only trigger on genuine multi-candle structural reversals, NOT on 1-tick price noise.
+        """
         try:
+            if len(df) < 5 or not self.current_trade:
+                return False
+            
+            # Require minimum holding time (at least 3 candles / minutes) before early exit can trigger
+            bars_held = self.current_trade.get('bars_held', 0)
+            if bars_held < 3:
+                return False
+                
             latest = df.iloc[-1]
+            prev = df.iloc[-2]
             
-            # Get momentum indicators
-            rsi = latest.get('rsi', 50)
-            macd_signal = latest.get('macd_signal', 0)
-            price_velocity = latest.get('price_velocity', 0)
-            
-            # Exit long positions
+            # Genuine structural reversal: strong candle close opposing direction
             if side == 'buy':
-                return (rsi > 70 and macd_signal < 0) or price_velocity < -0.3
-            
-            # Exit short positions
+                return latest['close'] < prev['low'] and latest.get('rsi', 50) < 35
             else:
-                return (rsi < 30 and macd_signal > 0) or price_velocity > 0.3
+                return latest['close'] > prev['high'] and latest.get('rsi', 50) > 65
                 
         except Exception as e:
             logger.error(f"Error checking early exit: {e}")
