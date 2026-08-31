@@ -400,11 +400,13 @@ class GoldTradingBot:
                 logger.error(f"Error initializing strategy: {e}")
                 self.strategy = None
         
-        # Risk management
+        # Risk management & Execution Cooldowns
         self.daily_pnl = 0.0
         self.max_daily_loss = config.RISK_MANAGEMENT.get('daily_loss_limit', 5.0)
         self.correlation_matrix = {}
         self.last_correlation_update = 0
+        self.symbol_cooldowns = {}       # symbol -> timestamp when cooldown ends
+        self.last_traded_candle = {}     # symbol -> last candle timestamp traded on
         
         # Initialize scheduler
         self.scheduler = BackgroundScheduler()
@@ -491,6 +493,15 @@ class GoldTradingBot:
         if strategy and strategy.ai_analyzer:
             strategy.ai_analyzer.update_model(trade_result)
         
+        # Post-Trade Execution Cooldown (Anti-Churn & Anti-Revenge Guard)
+        now_t = time.time()
+        if profitable:
+            self.symbol_cooldowns[symbol] = now_t + 90 # 1.5 minutes cooldown
+            logger.info(f"[{symbol}] Trade WIN (+{profit:.2f}) - Cooldown active for 90s.")
+        else:
+            self.symbol_cooldowns[symbol] = now_t + 300 # 5 minutes cooldown on loss
+            logger.info(f"[{symbol}] Trade LOSS ({profit:.2f}) - 5-Minute (300s) Cooldown active to let market settle.")
+
         # Log trade result
         logger.info(f"{symbol} trade completed - Profit: {profit:.2f}, Success: {profitable}")
         
@@ -501,7 +512,8 @@ class GoldTradingBot:
                 f"{status} - {symbol} Trade Closed\n"
                 f"Result: {'Profit' if profitable else 'Loss'}: {abs(profit):.2f}\n"
                 f"Entry: {entry_price:.2f}\n"
-                f"Exit: {exit_price:.2f}"
+                f"Exit: {exit_price:.2f}\n"
+                f"Cooldown: {'90s' if profitable else '5m'}"
             )
 
     def update_open_trades(self):
@@ -713,6 +725,13 @@ class GoldTradingBot:
             
             if not executor or not strategy:
                 logger.warning(f"  \\- {symbol}: Missing executor or strategy - SKIPPED")
+                return
+            
+            # 0. Check Symbol Execution Cooldown (Anti-Churn & Anti-Revenge Guard)
+            now_ts = time.time()
+            if now_ts < self.symbol_cooldowns.get(symbol, 0):
+                remaining_s = int(self.symbol_cooldowns[symbol] - now_ts)
+                logger.info(f"  \\- {symbol}: In post-trade cooldown ({remaining_s}s remaining) - SKIPPED")
                 return
             
             # Check global risk limits
@@ -1008,6 +1027,12 @@ class GoldTradingBot:
                         high_quality_signal['stop_loss']
                     )
                 
+                # Check Candle Lock: Only 1 trade allowed per candle bar
+                latest_bar_id = str(primary_df.iloc[-1].get('time', primary_df.index[-1]))
+                if self.last_traded_candle.get(symbol) == latest_bar_id:
+                    logger.info(f"  \\- {symbol}: Candle Lock Active (Already traded on candle {latest_bar_id}) - WAITING for next bar")
+                    return
+                
                 # Execute the trade with enhanced logging
                 logger.info(f"[EXECUTING] {symbol} {signal_type} TRADE:")
                 logger.info(f"   Entry: {high_quality_signal['entry_price']:.5f}")
@@ -1027,6 +1052,7 @@ class GoldTradingBot:
                 )
                 
                 if trade_id:
+                    self.last_traded_candle[symbol] = latest_bar_id
                     logger.info(f"[SUCCESS] {symbol} trade opened with ID: {trade_id}")
                     logger.info(f"Trade Type: {high_quality_signal['signal_type']}")
                     logger.info(f"Quality Score: {high_quality_signal.get('quality_score', 0):.1f}%")
