@@ -1397,23 +1397,53 @@ class MT5Executor:
             # Basic validation for SL/TP values
             if stop_loss is not None and stop_loss <= 0:
                 logger.error(f"Invalid stop loss value: {stop_loss}")
-                return False
-            if take_profit is not None and take_profit <= 0:
-                logger.error(f"Invalid take profit value: {take_profit}")
-                return False
+            # Sanitize SL and TP against broker stops_level and symbol digits
+            sym_info = mt5.symbol_info(position.symbol)
+            digits = getattr(sym_info, 'digits', 2) if sym_info else 2
+            point = getattr(sym_info, 'point', 0.01) if sym_info else 0.01
+            stops_lvl = getattr(sym_info, 'trade_stops_level', 0) if sym_info else 0
+            min_dist = max((stops_lvl + 10) * point, self.get_minimum_distance())
             
+            final_sl = position.sl
+            if stop_loss is not None and float(stop_loss) > 0:
+                sl_val = float(stop_loss)
+                # Ensure SL is on correct side of market and respects min distance
+                if position.type == mt5.ORDER_TYPE_BUY:
+                    if sl_val > current_price - min_dist:
+                        sl_val = current_price - min_dist
+                    final_sl = round(sl_val, digits)
+                elif position.type == mt5.ORDER_TYPE_SELL:
+                    if sl_val < current_price + min_dist:
+                        sl_val = current_price + min_dist
+                    final_sl = round(sl_val, digits)
+            
+            final_tp = position.tp
+            if take_profit is not None and float(take_profit) > 0:
+                tp_val = float(take_profit)
+                if position.type == mt5.ORDER_TYPE_BUY:
+                    if tp_val < current_price + min_dist:
+                        tp_val = current_price + min_dist
+                    final_tp = round(tp_val, digits)
+                elif position.type == mt5.ORDER_TYPE_SELL:
+                    if tp_val > current_price - min_dist:
+                        tp_val = current_price - min_dist
+                    final_tp = round(tp_val, digits)
+
+            # Check if values actually changed
+            if abs(final_sl - position.sl) < (point * 0.5) and abs(final_tp - position.tp) < (point * 0.5):
+                logger.debug(f"Position {position_id} SL/TP already matches requested values.")
+                return True
+
             # Prepare the request
             request = {
                 "action": mt5.TRADE_ACTION_SLTP,
                 "symbol": position.symbol,
                 "position": position_id,
-                "sl": float(stop_loss) if stop_loss is not None else 0.0,
-                "tp": float(take_profit) if take_profit is not None else 0.0
+                "sl": float(final_sl),
+                "tp": float(final_tp)
             }
             
-            logger.debug(f"Modifying position {position_id}: SL={stop_loss} (was {current_sl}), TP={take_profit} (was {current_tp}), "
-                        f"Current price={current_price}, Position type={position.type}")
-            logger.debug(f"SL changed: {sl_changed}, TP changed: {tp_changed}")
+            logger.info(f"Modifying position {position_id} ({position.symbol}): SL={final_sl} (was {position.sl}), TP={final_tp} (was {position.tp})")
             
             # Send the order
             result = mt5.order_send(request)
@@ -1422,15 +1452,14 @@ class MT5Executor:
                 return False
                 
             if result.retcode != mt5.TRADE_RETCODE_DONE:
-                # Handle "No changes" error as success
-                if result.retcode == 10025:  # MT5 error code for "No changes"
+                if result.retcode == 10025:  # MT5 code for "No changes"
                     logger.debug(f"Position {position_id} modification: No changes needed (MT5 code 10025)")
                     return True
                 else:
-                    logger.error(f"Failed to modify position: {result.retcode}, {result.comment}")
+                    logger.error(f"Failed to modify position: Code {result.retcode}, {result.comment}")
                     return False
             
-            logger.info(f"Position {position_id} modified: SL={stop_loss}, TP={take_profit}")
+            logger.info(f"Position {position_id} successfully updated on MT5: SL={final_sl}, TP={final_tp}")
             return True
             
         except Exception as e:

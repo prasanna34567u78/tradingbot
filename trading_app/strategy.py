@@ -523,7 +523,8 @@ class SMCStrategy:
                     logger.info(f"[{symbol}] 🎯 Dynamic Partial Booking Triggered ({profit_tp_pct*100:.1f}% of TP). Booking {partial_close_pct}% lot.")
             
             # 3. Trailing Stop Loss Logic (Skipped if static_sl is True)
-            if not static_sl and trail_sl and profit_tp_pct >= start_ratio:
+            trail_start_threshold = min(start_ratio, 0.6)  # Start trailing smoothly as trade advances
+            if not static_sl and trail_sl and profit_tp_pct >= trail_start_threshold:
                 self.trailing_activated = True
                 new_stop = self._calculate_trailing_stop(df, current_price, current_stop, atr, side)
                 if new_stop:
@@ -533,7 +534,7 @@ class SMCStrategy:
                     if is_advancing:
                         result['stop_loss'] = new_stop
                         self.last_trail_price = new_stop
-                        logger.info(f"[{symbol}] Trailing SL Advanced to {new_stop:.5f} (Profit: {profit_tp_pct*100:.1f}% of TP, Trail Step: {trail_step}x ATR)")
+                        logger.info(f"[{symbol}] 🛡️ Trailing SL Advanced to {new_stop:.5f} (Profit: {profit_tp_pct*100:.1f}% of TP, Trail Step: {trail_step}x ATR)")
             
             # 4. Trailing Take Profit Logic (Controlled by trail_tp checkbox & start_ratio)
             if trail_tp and profit_tp_pct >= start_ratio:
