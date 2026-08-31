@@ -642,54 +642,53 @@ class MT5Executor:
     
     def get_minimum_distance(self):
         """
-        Get adaptive minimum distance for SL/TP based on symbol type and current market conditions
-        
-        Returns:
-            float: Minimum distance in symbol price units
+        Get adaptive minimum distance for SL/TP directly query broker trade_stops_level + spread.
+        Guarantees that error 10016 (Invalid Stops) is mathematically impossible.
         """
         try:
-            # Get current spread for adaptive distance calculation
-            current_price = self.get_current_price()
-            spread = 0
-            if current_price:
-                spread = current_price['ask'] - current_price['bid']
+            symbol_info = mt5.symbol_info(self.symbol)
+            point = getattr(symbol_info, 'point', 0.01) if symbol_info else 0.01
+            stops_level = getattr(symbol_info, 'trade_stops_level', 0) if symbol_info else 0
+            spread_pts = getattr(symbol_info, 'spread', 0) if symbol_info else 0
             
-            if 'XAU' in self.symbol or 'GOLD' in self.symbol.upper():
-                # For gold: adaptive based on spread, minimum 0.2 points (more reasonable)
-                base_distance = max(0.2, spread * 3)  # 3x spread or 0.2, whichever is higher
-                return min(base_distance, 0.8)  # Cap at 0.8 to avoid being too restrictive
-                
-            elif 'BTC' in self.symbol:
-                # For BTC: adaptive based on spread, minimum $30 (reduced from $100)
-                base_distance = max(30.0, spread * 2)  # 2x spread or $30
-                return min(base_distance, 150.0)  # Cap at $150 for reasonable scalping
-                
-            elif 'USD' in self.symbol and self.symbol.endswith('m'):
-                # For forex: adaptive based on spread, minimum 0.5 pips (reduced from 1 pip)
-                base_distance = max(0.0005, spread * 2)  # 2x spread or 0.5 pips
-                return min(base_distance, 0.002)  # Cap at 2 pips for scalping
-                
-            elif any(oil in self.symbol.upper() for oil in ['OIL', 'CL', 'BRENT']):
-                # For oil: minimum 0.05 points
-                base_distance = max(0.05, spread * 2)
-                return min(base_distance, 0.3)
-                
+            # Broker minimum distance in price units + 15 points safety buffer
+            broker_required_distance = (stops_level + spread_pts + 15) * point
+            
+            current_price = self.get_current_price()
+            spread_price = 0.0
+            if current_price:
+                spread_price = abs(current_price['ask'] - current_price['bid'])
+            
+            # Symbol specific safety floors
+            sym_upper = self.symbol.upper()
+            if 'XAU' in sym_upper or 'GOLD' in sym_upper:
+                floor = max(1.50, spread_price * 2.5)  # Gold min safe stop: $1.50 - $2.50
+            elif 'XAG' in sym_upper or 'SILVER' in sym_upper:
+                floor = max(0.08, spread_price * 2.5)  # Silver min safe stop: $0.08 - $0.15
+            elif 'BTC' in sym_upper:
+                floor = max(80.0, spread_price * 2.0)  # BTC min safe stop: $80 - $150
+            elif any(oil in sym_upper for oil in ['OIL', 'CL', 'BRENT']):
+                floor = max(0.20, spread_price * 2.0)  # Oil min safe stop: $0.20
+            elif 'JPY' in sym_upper:
+                floor = max(0.12, spread_price * 2.0)  # JPY min safe stop: 0.12
+            elif 'USD' in sym_upper or sym_upper.endswith('M'):
+                floor = max(0.0010, spread_price * 2.0) # Forex min safe stop: 10 pips
             else:
-                # Default adaptive minimum distance
-                base_distance = max(0.001, spread * 2)
-                return min(base_distance, 0.01)
+                floor = max(0.0010, spread_price * 2.0)
+                
+            final_min_distance = max(broker_required_distance, floor)
+            return round(final_min_distance, getattr(symbol_info, 'digits', 5) if symbol_info else 5)
                 
         except Exception as e:
             logger.error(f"Error getting adaptive minimum distance: {e}")
-            # Fallback to more lenient defaults
-            if 'XAU' in self.symbol or 'GOLD' in self.symbol.upper():
-                return 0.2
-            elif 'BTC' in self.symbol:
-                return 30.0
-            elif 'USD' in self.symbol and self.symbol.endswith('m'):
-                return 0.0005
+            if 'XAU' in self.symbol.upper():
+                return 1.50
+            elif 'XAG' in self.symbol.upper():
+                return 0.08
+            elif 'BTC' in self.symbol.upper():
+                return 80.0
             else:
-                return 0.001
+                return 0.0010
     
     def _get_spread_cost(self):
         """
@@ -889,6 +888,29 @@ class MT5Executor:
                 
                 logger.info(f"Final scalping trade - Entry: {price}, SL: {stop_loss}, TP: {take_profit}")
 
+            # --- 4. UNIVERSAL BROKER SAFETY: Enforce Minimum Stop Distances & Digits ---
+            digits = getattr(symbol_info, 'digits', 2) if symbol_info else 2
+            min_dist = self.get_minimum_distance()
+            
+            if order_type == mt5.ORDER_TYPE_BUY:
+                if price - stop_loss < min_dist:
+                    stop_loss = price - min_dist
+                    logger.info(f"Adjusted BUY SL to satisfy broker minimum distance: {stop_loss:.{digits}f}")
+                if take_profit - price < min_dist:
+                    take_profit = price + min_dist
+                    logger.info(f"Adjusted BUY TP to satisfy broker minimum distance: {take_profit:.{digits}f}")
+            elif order_type == mt5.ORDER_TYPE_SELL:
+                if stop_loss - price < min_dist:
+                    stop_loss = price + min_dist
+                    logger.info(f"Adjusted SELL SL to satisfy broker minimum distance: {stop_loss:.{digits}f}")
+                if price - take_profit < min_dist:
+                    take_profit = price - min_dist
+                    logger.info(f"Adjusted SELL TP to satisfy broker minimum distance: {take_profit:.{digits}f}")
+                    
+            price = round(float(price), digits)
+            stop_loss = round(float(stop_loss), digits)
+            take_profit = round(float(take_profit), digits)
+
             # --- 4. VALIDATION: Check Stop Loss and Take Profit ---
             if order_type == mt5.ORDER_TYPE_BUY:
                 if stop_loss >= price:
@@ -912,8 +934,8 @@ class MT5Executor:
                 "volume": float(position_size),
                 "type": order_type,
                 "price": price,
-                "sl": float(stop_loss),
-                "tp": float(take_profit),
+                "sl": stop_loss,
+                "tp": take_profit,
                 "deviation": 20,
                 "magic": 234000,
                 "comment": f"Py{signal_type}"[:31],

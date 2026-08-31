@@ -308,25 +308,35 @@ class SMCStrategy:
                 symbol = symbol
                 
                 if 'BTC' in symbol:
-                    # Bitcoin needs much larger distances (account for high spreads)
-                    pip_value = 1.0      # $1 movements for BTC
-                    target_pips = 200    # $200 target (improved 1:2.67 ratio)
-                    stop_pips = 75       # $75 stop (keeps risk manageable)
-                elif 'USD' in symbol and symbol.endswith('m'):
-                    # Forex pairs
-                    pip_value = 0.0001   # Standard pip size
-                    target_pips = 20     # 20 pip target (improved 1:2.5 ratio)
-                    stop_pips = 8        # 8 pip stop
+                    # Bitcoin
+                    pip_value = 1.0
+                    target_pips = 250.0  # $250 target
+                    stop_pips = 100.0    # $100 stop
                 elif 'XAU' in symbol or 'GOLD' in symbol.upper():
-                    # Gold
-                    pip_value = 0.01     # $0.01 movements
-                    target_pips = 20     # $0.20 target (improved 1:2.5 ratio)
-                    stop_pips = 8        # $0.08 stop
+                    # Gold ($1.00 move = 1.0 point, $0.10 = 1 pip)
+                    pip_value = 0.10
+                    target_pips = 20.0   # $2.00 target
+                    stop_pips = 13.0     # $1.30 stop (well above broker stops_level)
+                elif 'XAG' in symbol or 'SILVER' in symbol.upper():
+                    # Silver (1 cent = $0.01)
+                    pip_value = 0.01
+                    target_pips = 25.0   # $0.25 target
+                    stop_pips = 10.0     # $0.10 stop
+                elif any(oil in symbol.upper() for oil in ['OIL', 'CL', 'BRENT']):
+                    # Crude Oil
+                    pip_value = 0.01
+                    target_pips = 50.0   # $0.50 target
+                    stop_pips = 25.0     # $0.25 stop
+                elif 'JPY' in symbol.upper():
+                    # JPY pairs
+                    pip_value = 0.01
+                    target_pips = 25.0   # 25 pips
+                    stop_pips = 12.0     # 12 pips
                 else:
-                    # Default/conservative
+                    # Standard Forex pairs
                     pip_value = 0.0001
-                    target_pips = 8
-                    stop_pips = 4       # Tight 4 pip stop
+                    target_pips = 25.0   # 25 pips
+                    stop_pips = 12.0     # 12 pips
                 
                 if confluence['signal'] == 1:
                     df.loc[latest_idx, 'signal'] = 1
