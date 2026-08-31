@@ -354,12 +354,17 @@ class ScalpingStrategy:
                 
         except Exception as e:
             logger.error(f"Error in mean reversion scalping: {e}")
-    
-    def _apply_breakout_scalping_strategy(self, df):
-        """Apply breakout scalping strategy"""
+    def _apply_breakout_scalping_strategy(self, df, symbol="XAUUSDm"):
+        """Apply breakout scalping strategy with proper pip scaling and minimum safe broker distance"""
         try:
             latest_idx = df.index[-1]
             latest = df.iloc[-1]
+            atr = latest.get('atr', 1.0)
+            
+            pip_mult = self._get_pip_multiplier(symbol)
+            min_sl = 1.20 if ('XAU' in str(symbol).upper() or 'GOLD' in str(symbol).upper()) else (self.sl_pips * pip_mult)
+            sl_dist = max(atr * 1.0, min_sl)
+            tp_dist = sl_dist * 1.5
             
             # Simple breakout detection
             recent_high = df['high'].rolling(window=5).max().iloc[-2]
@@ -368,8 +373,8 @@ class ScalpingStrategy:
             # Bullish breakout scalp
             if latest['close'] > recent_high:
                 entry_price = latest['close']
-                stop_loss = entry_price - (self.sl_pips * 0.0001)
-                take_profit = entry_price + (self.tp_pips * 0.0001)
+                stop_loss = entry_price - sl_dist
+                take_profit = entry_price + tp_dist
                 
                 df.loc[latest_idx, 'signal'] = 1
                 df.loc[latest_idx, 'entry_price'] = entry_price
@@ -377,12 +382,13 @@ class ScalpingStrategy:
                 df.loc[latest_idx, 'take_profit'] = take_profit
                 df.loc[latest_idx, 'signal_type'] = 'breakout_scalp_buy'
                 df.loc[latest_idx, 'scalp_confidence'] = 0.75
+                logger.info(f"[{symbol}] Breakout scalp BUY - Entry: {entry_price:.3f}, SL: {stop_loss:.3f}, TP: {take_profit:.3f}")
             
             # Bearish breakdown scalp
             elif latest['close'] < recent_low:
                 entry_price = latest['close']
-                stop_loss = entry_price + (self.sl_pips * 0.0001)
-                take_profit = entry_price - (self.tp_pips * 0.0001)
+                stop_loss = entry_price + sl_dist
+                take_profit = entry_price - tp_dist
                 
                 df.loc[latest_idx, 'signal'] = -1
                 df.loc[latest_idx, 'entry_price'] = entry_price
@@ -390,12 +396,13 @@ class ScalpingStrategy:
                 df.loc[latest_idx, 'take_profit'] = take_profit
                 df.loc[latest_idx, 'signal_type'] = 'breakout_scalp_sell'
                 df.loc[latest_idx, 'scalp_confidence'] = 0.75
+                logger.info(f"[{symbol}] Breakout scalp SELL - Entry: {entry_price:.3f}, SL: {stop_loss:.3f}, TP: {take_profit:.3f}")
                 
         except Exception as e:
             logger.error(f"Error in breakout scalping: {e}")
     
-    def update_scalping_trade(self, df, current_price):
-        """Update scalping trade with aggressive trailing and quick exits"""
+    def update_scalping_trade(self, df, current_price, symbol="XAUUSDm"):
+        """Update scalping trade with aggressive trailing, breakeven lock, and quick exits"""
         try:
             if not self.current_trade:
                 return None
@@ -403,32 +410,37 @@ class ScalpingStrategy:
             trade_info = self.current_trade
             entry_price = trade_info['entry_price']
             side = trade_info['side']
+            pip_mult = self._get_pip_multiplier(symbol)
             
-            # Calculate current profit in pips
+            # Calculate current profit in points / pips correctly
             if side == 'buy':
-                profit_pips = (current_price['bid'] - entry_price) * 10000
-                current_stop = trade_info.get('stop_loss', entry_price - 0.0004)
+                profit_pts = current_price['bid'] - entry_price
+                profit_pips = profit_pts / pip_mult if pip_mult > 0 else 0
+                current_stop = trade_info.get('stop_loss', entry_price - (1.20 if 'XAU' in str(symbol).upper() else 0.0010))
             else:
-                profit_pips = (entry_price - current_price['ask']) * 10000
-                current_stop = trade_info.get('stop_loss', entry_price + 0.0004)
+                profit_pts = entry_price - current_price['ask']
+                profit_pips = profit_pts / pip_mult if pip_mult > 0 else 0
+                current_stop = trade_info.get('stop_loss', entry_price + (1.20 if 'XAU' in str(symbol).upper() else 0.0010))
             
             actions = {'stop_loss': None, 'take_profit': None, 'close_trade': False}
             
             # Quick breakeven
+            be_buffer = 0.15 if ('XAU' in str(symbol).upper() or 'GOLD' in str(symbol).upper()) else (1.0 * pip_mult)
             if not trade_info.get('breakeven_set', False) and profit_pips >= self.quick_breakeven_pips:
-                actions['stop_loss'] = entry_price
+                actions['stop_loss'] = entry_price + be_buffer if side == 'buy' else entry_price - be_buffer
                 trade_info['breakeven_set'] = True
                 logger.info(f"Scalping trade moved to breakeven after {profit_pips:.1f} pips profit")
             
             # Start trailing
             elif profit_pips >= self.trailing_start_pips:
+                step_dist = max(self.trailing_step_pips * pip_mult, 0.40 if 'XAU' in str(symbol).upper() else 0.0004)
                 if side == 'buy':
-                    new_stop = current_price['bid'] - (self.trailing_step_pips * 0.0001)
+                    new_stop = current_price['bid'] - step_dist
                     if new_stop > current_stop:
                         actions['stop_loss'] = new_stop
                         logger.debug(f"Trailing stop updated: {new_stop:.5f}")
                 else:
-                    new_stop = current_price['ask'] + (self.trailing_step_pips * 0.0001)
+                    new_stop = current_price['ask'] + step_dist
                     if new_stop < current_stop:
                         actions['stop_loss'] = new_stop
                         logger.debug(f"Trailing stop updated: {new_stop:.5f}")
