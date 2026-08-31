@@ -170,14 +170,31 @@ class ScalpingStrategy:
             if self.current_trade is not None:
                 return df
             
-            # Apply scalping strategies in priority order
+            # Calculate Trend Filter (Anti-Falling-Knife & Anti-Top-Shorting Guard)
+            df['ema_fast'] = df['close'].ewm(span=20).mean()
+            df['ema_slow'] = df['close'].ewm(span=100).mean()
+            latest = df.iloc[-1]
+            is_bearish_trend = latest['close'] < latest['ema_slow'] and latest['ema_fast'] < latest['ema_slow']
+            is_bullish_trend = latest['close'] > latest['ema_slow'] and latest['ema_fast'] > latest['ema_slow']
+            
+            # Apply scalping strategies in priority order with strict Trend Alignment
             self._apply_fvg_orderflow_scalping_strategy(df)
             if df.loc[df.index[-1], 'signal'] == 0:
                 self._apply_momentum_scalping_strategy(df)
-            if df.loc[df.index[-1], 'signal'] == 0:
+            if df.loc[df.index[-1], 'signal'] == 0 and not (is_bearish_trend or is_bullish_trend):
+                # Only allow mean-reversion in sideways range markets (never in strong trends!)
                 self._apply_mean_reversion_scalping_strategy(df)
             if df.loc[df.index[-1], 'signal'] == 0:
                 self._apply_breakout_scalping_strategy(df)
+            
+            # Final Trend Safety Filter: Block counter-trend signals
+            latest_sig = df.loc[df.index[-1], 'signal']
+            if latest_sig == 1 and is_bearish_trend:
+                logger.warning(f"Blocked counter-trend BUY signal during strong BEARISH trend (Close {latest['close']:.2f} < EMA100 {latest['ema_slow']:.2f})")
+                df.loc[df.index[-1], 'signal'] = 0
+            elif latest_sig == -1 and is_bullish_trend:
+                logger.warning(f"Blocked counter-trend SELL signal during strong BULLISH trend (Close {latest['close']:.2f} > EMA100 {latest['ema_slow']:.2f})")
+                df.loc[df.index[-1], 'signal'] = 0
             
             return df
             
