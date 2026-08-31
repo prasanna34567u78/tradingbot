@@ -62,10 +62,9 @@ class TradeQualityFilter:
             session_filter = self.quality_config.get('session_filter', True)
             if session_filter and self._is_active_session():
                 quality_score += 15
-                reasons.append("Active trading session")
+                reasons.append("Active trading session (High Liquidity)")
             else:
-                quality_score += 65
-                reasons.append("Inactive trading session")
+                reasons.append("Inactive trading session (Low Liquidity)")
             
             # 4. Momentum confirmation (20 points)
             momentum_score = self._check_momentum(df)
@@ -77,12 +76,13 @@ class TradeQualityFilter:
             else:
                 reasons.append("Weak momentum")
             
-            # 5. Structure break confirmation (20 points)
-            if self._check_structure_break(df, signal_data):
+            # 5. Structure break confirmation (20 points - Required for SMC/Scalp)
+            has_structure_break = self._check_structure_break(df, signal_data)
+            if has_structure_break:
                 quality_score += 20
-                reasons.append("Clear structure break")
+                reasons.append("Clear structure break / FVG Order Block confirmed")
             else:
-                reasons.append("No clear structure break")
+                reasons.append("No clear structure break / FVG")
             
             # Calculate final quality percentage
             quality_percentage = (quality_score / max_score) * 100
@@ -154,26 +154,17 @@ class TradeQualityFilter:
             return False
     
     def _is_active_session(self):
-        """Check if we're in an active trading session"""
+        """Check if we're in an active institutional trading session using UTC"""
         try:
-            current_time = datetime.now().time()
+            # Active institutional liquidity window: 07:00 UTC to 21:30 UTC (London + NY)
+            now_utc = datetime.utcnow().time()
+            session_start = time(7, 0)   # London Open (7:00 UTC / 12:30 PM IST)
+            session_end = time(21, 30)   # NY Close (21:30 UTC / 3:00 AM IST)
             
-            # London session: 8:00 - 17:00 GMT
-            london_start = time(8, 0)
-            london_end = time(17, 0)
-            
-            # New York session: 13:00 - 22:00 GMT  
-            ny_start = time(13, 0)
-            ny_end = time(22, 0)
-            
-            # Check if in either active session
-            in_london = london_start <= current_time <= london_end
-            in_ny = ny_start <= current_time <= ny_end
-            
-            return in_london or in_ny
+            return session_start <= now_utc <= session_end
             
         except Exception:
-            return True  # Default to allowing trades if check fails
+            return True
     
     def _check_momentum(self, df):
         """Check momentum indicators for signal strength"""
