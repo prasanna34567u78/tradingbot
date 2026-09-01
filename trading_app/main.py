@@ -878,6 +878,21 @@ class GoldTradingBot:
                 return
 
             # ── 2. Scalping / SMC Mode Fallback ──────────────────────────
+            # Macro HTF Trend Anchor (1H / 15M Directional Filter)
+            htf_df = executor.fetch_historical_data_mt5_symbol(symbol, '1h', 100)
+            if htf_df is None or len(htf_df) < 20:
+                htf_df = executor.fetch_historical_data_mt5_symbol(symbol, '15m', 150)
+            
+            macro_trend = 'neutral'
+            if htf_df is not None and len(htf_df) >= 20:
+                htf_ema50 = htf_df['close'].ewm(span=50).mean().iloc[-1]
+                htf_close = htf_df['close'].iloc[-1]
+                if htf_close > htf_ema50:
+                    macro_trend = 'bullish'
+                else:
+                    macro_trend = 'bearish'
+                logger.info(f"  +- {symbol}: Macro 1H/15M Trend Anchor: {macro_trend.upper()} (Price {htf_close:.2f} vs EMA50 {htf_ema50:.2f})")
+
             timeframes = ['5m', '1m']
             mtf_analysis = {}
             
@@ -918,8 +933,16 @@ class GoldTradingBot:
                 logger.info(f"  \\- {symbol}: No scalping signal found - NO TRADE")
                 return
             
+            # HARD MACRO TREND DIRECTION FILTER: Never trade against the 1H/15M Macro Trend!
+            if confluence['signal'] == 1 and macro_trend == 'bearish':
+                logger.warning(f"  \\- {symbol}: 🚨 Counter-Trend BUY BLOCKED! Macro Trend is BEARISH (avoiding falling-knife trap) - NO TRADE")
+                return
+            elif confluence['signal'] == -1 and macro_trend == 'bullish':
+                logger.warning(f"  \\- {symbol}: 🚨 Counter-Trend SELL BLOCKED! Macro Trend is BULLISH (avoiding counter-pump short) - NO TRADE")
+                return
+            
             signal_type = "BUY" if confluence['signal'] > 0 else "SELL"
-            logger.info(f"  +- {symbol}: SCALPING SIGNAL! {signal_type} (confidence: {confluence.get('confidence', 0):.1%})")
+            logger.info(f"  +- {symbol}: SCALPING SIGNAL! {signal_type} aligned with {macro_trend.upper()} Macro Trend (confidence: {confluence.get('confidence', 0):.1%})")
             
             signal_direction = confluence['signal']
             if not executor.check_correlation_risk(symbol, signal_direction):
