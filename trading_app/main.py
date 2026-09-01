@@ -831,7 +831,32 @@ class GoldTradingBot:
                 take_profit = float(confirmed_bar.get('take_profit', confirmed_bar.get('tp2', confirmed_bar.get('tp1', 0.0))))
                 rr_ratio = float(confirmed_bar.get('rr_tp2', 1.5))
                 zone_name = str(confirmed_bar.get('pde_zone', ''))
-                
+
+                # ── Fix 1: PDE Macro 1H/4H HTF Trend Guard ──────────────────
+                # Prevents PDE from buying into bearish macro trends or selling into bullish trends
+                try:
+                    htf_pde_df = executor.fetch_historical_data_mt5_symbol(symbol, '1h', 100)
+                    if htf_pde_df is None or len(htf_pde_df) < 20:
+                        htf_pde_df = executor.fetch_historical_data_mt5_symbol(symbol, '15m', 200)
+                    if htf_pde_df is not None and len(htf_pde_df) >= 20:
+                        htf_ema50 = htf_pde_df['close'].ewm(span=50, adjust=False).mean().iloc[-1]
+                        htf_ema200 = htf_pde_df['close'].ewm(span=200, adjust=False).mean().iloc[-1]
+                        htf_close  = htf_pde_df['close'].iloc[-1]
+                        pde_macro_trend = 'bullish' if htf_close > htf_ema50 and htf_ema50 > htf_ema200 else ('bearish' if htf_close < htf_ema50 and htf_ema50 < htf_ema200 else 'neutral')
+                        logger.info(f"  +- [PDE] Macro 1H Trend Guard: {pde_macro_trend.upper()} "
+                                    f"(Price {htf_close:.2f} / EMA50 {htf_ema50:.2f} / EMA200 {htf_ema200:.2f})")
+                        if signal_direction == 1 and pde_macro_trend == 'bearish':
+                            logger.warning(f"  \\- {symbol}: 🚨 [PDE] BUY BLOCKED — Discount Zone signal but 1H Macro is BEARISH "
+                                           f"(price {htf_close:.2f} < EMA50 {htf_ema50:.2f} < EMA200 {htf_ema200:.2f}). NO TRADE.")
+                            return
+                        elif signal_direction == -1 and pde_macro_trend == 'bullish':
+                            logger.warning(f"  \\- {symbol}: 🚨 [PDE] SELL BLOCKED — Premium Zone signal but 1H Macro is BULLISH "
+                                           f"(price {htf_close:.2f} > EMA50 {htf_ema50:.2f} > EMA200 {htf_ema200:.2f}). NO TRADE.")
+                            return
+                except Exception as htf_err:
+                    logger.warning(f"  +- [PDE] HTF trend guard check failed ({htf_err}) — proceeding without filter")
+                # ─────────────────────────────────────────────────────────────
+
                 logger.info(f"  +- {symbol}: [PDE SIGNAL TRIGGERED on CLOSED BAR {bar_time}] {signal_type} in {zone_name.upper()} ZONE! Entry: {entry_price:.5f}, SL: {stop_loss:.5f}, TP: {take_profit:.5f}, RR: {rr_ratio:.2f}")
                 
                 # Check correlation risk

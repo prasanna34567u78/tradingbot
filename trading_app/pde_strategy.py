@@ -142,7 +142,14 @@ class PDEStrategy:
         df["rr_tp2"]         = np.nan
         df["atr_value"]      = atr
 
-        warmup        = max(self.swing_lookback, 50)
+        # Fix 2: Pre-compute EMA50 & EMA200 for macro trend gate (vectorized, no lookahead)
+        ema_50_series  = df['close'].ewm(span=50,  adjust=False).mean()
+        ema_200_series = df['close'].ewm(span=200, adjust=False).mean()
+
+        # Fix 3: Pre-compute ATR average for dynamic lookback
+        avg_atr = atr.rolling(50, min_periods=10).mean()
+
+        warmup        = max(self.swing_lookback, 50, 200)
         last_sig_bar  = -self.cooldown_bars   # index of last signal
 
         for i in range(warmup, len(df)):
@@ -155,7 +162,20 @@ class PDEStrategy:
             if i - last_sig_bar < self.cooldown_bars:
                 continue
 
-            zones = calculate_pde_zones(sw_hi.iloc[i], sw_lo.iloc[i])
+            # Fix 3: Dynamic swing lookback — shrink window in high-volatility/trending markets
+            avg_a = avg_atr.iloc[i] if not pd.isna(avg_atr.iloc[i]) else a
+            vol_ratio = a / max(avg_a, 1e-8)
+            # High volatility (trending) → use shorter window; low vol (ranging) → use full window
+            if vol_ratio > 1.5:
+                dynamic_lb = max(10, int(self.swing_lookback * 0.4))   # 40% of lookback in strong trend
+            elif vol_ratio > 1.2:
+                dynamic_lb = max(15, int(self.swing_lookback * 0.6))   # 60% in moderate trend
+            else:
+                dynamic_lb = self.swing_lookback                        # Full lookback in ranging market
+            swing_start = max(0, i - dynamic_lb)
+            sw_hi_dyn = df["high"].iloc[swing_start: i + 1].max()
+            sw_lo_dyn = df["low"].iloc[swing_start: i + 1].min()
+            zones = calculate_pde_zones(sw_hi_dyn, sw_lo_dyn)
             if not zones or zones["range_size"] < 2 * a:
                 # Range too small relative to ATR — skip (noise)
                 continue
@@ -169,15 +189,21 @@ class PDEStrategy:
             bar_bull = df["close"].iloc[i] > df["open"].iloc[i]
             bar_bear = df["close"].iloc[i] < df["open"].iloc[i]
 
+            # Fix 2: Macro trend gate using EMA50 vs EMA200 on the SAME timeframe (no lookahead)
+            e50  = ema_50_series.iloc[i]
+            e200 = ema_200_series.iloc[i]
+            macro_bearish = (not pd.isna(e50)) and (not pd.isna(e200)) and e50 < e200
+            macro_bullish = (not pd.isna(e50)) and (not pd.isna(e200)) and e50 > e200
+
             # Volume check
             vol_ok = True
             if self.volume_filter and vol_avg is not None and pd.notna(vol_avg.iloc[i]):
                 vol_ok = df["volume"].iloc[i] >= 0.75 * vol_avg.iloc[i]
 
             # ════════════════════════════════════════
-            #  BUY  —  Discount Zone
+            #  BUY  —  Discount Zone (only if NOT in macro downtrend)
             # ════════════════════════════════════════
-            if zone == "discount" and vol_ok:
+            if zone == "discount" and vol_ok and not macro_bearish:
                 rsi_ok = pd.isna(rsi_v) or rsi_v <= self.rsi_buy_threshold
 
                 if self.require_confirmation:
@@ -209,9 +235,9 @@ class PDEStrategy:
                         last_sig_bar = i
 
             # ════════════════════════════════════════
-            #  SELL  —  Premium Zone
+            #  SELL  —  Premium Zone (only if NOT in macro uptrend)
             # ════════════════════════════════════════
-            elif zone == "premium" and vol_ok:
+            elif zone == "premium" and vol_ok and not macro_bullish:
                 rsi_ok = pd.isna(rsi_v) or rsi_v >= self.rsi_sell_threshold
 
                 if self.require_confirmation:
