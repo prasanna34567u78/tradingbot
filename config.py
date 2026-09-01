@@ -187,6 +187,21 @@ PDE_SETTINGS = {
     'discount_threshold':   0.382,    # Below 38.2% Fib = Discount zone
 }
 
+# Trend-Adaptive Liquidity Sweep Structure Settings (v1 - High Alpha Mode)
+# 1Y 5M Real MT5 Results: +$3,063 USD (+30.6% on 0.02 lot) / +$46,090 USD (+460.9% compounding)
+SWEEP_STRUCTURE_SETTINGS = {
+    'enabled':              True,
+    'timeframe':            '5m',      # 5-minute primary execution timeframe
+    'sweep_lookback':       15,        # 15 bars swing high/low reference lookback
+    'min_base_bars':        2,         # Minimum consolidation base bars
+    'max_base_bars':        10,        # Maximum consolidation base bars
+    'sl_buffer_pts':        0.35,      # Stop loss buffer beyond sweep extreme
+    'buy_rr':               3.0,       # 1:3 Risk:Reward on BUY setups in Bullish Trend
+    'sell_rr':              2.0,       # 1:2 Risk:Reward on SELL setups in Bearish Trend
+    'session_filter':       True,      # Filter to Asian (00-07 UTC) + NY Power (13-18 UTC) + Overnight (18-00 UTC)
+    'cooldown_bars':        8,         # 8 bars (40 mins) cooldown between trades
+}
+
 # Model Context Protocol (MCP) Configuration
 MCP_SETTINGS = {
     'enabled': True,                     # Set True to enable MT5 MCP Tool Engine

@@ -159,7 +159,7 @@ export const Configuration = () => {
           {[
             { id: 'pde', title: 'PDE (Premium / Discount Engine)', desc: 'Institutional SMC value area targeting 70% Value Area + daily sessions.' },
             { id: 'mcp_enhanced', title: 'DeepSeek MCP Enhanced', desc: 'Combines dynamic order blocks, FVG liquidity, and deep reasoning.' },
-            { id: 'volume_profile', title: 'Volume Profile & POC Migration', desc: 'Executes strictly around high-volume Point of Control rejections.' },
+            { id: 'volume_profile', title: '⚡ Liquidity Sweep Structure (BUY 1:3 / SELL 1:2)', desc: 'Institutional SSL/BSL sweeps + 50% retest in Asian & NY power sessions. Highest 1Y profit.' },
             { id: 'scalping', title: 'High-Frequency M1 Scalping', desc: 'Precision rapid executions off microstructure orderflow breaks.' },
           ].map((mode) => {
             const isCurrent = (strategyMode === mode.id);

@@ -27,6 +27,7 @@ import config
 from indicators import SMCIndicators
 from strategy import SMCStrategy
 from trade_quality_improvement import TradeQualityFilter, EnhancedSignalGenerator
+from sweep_structure_strategy import SweepStructureStrategy
 
 # from webhook_listener import WebhookListener
 from logger import TradeLogger
@@ -900,6 +901,85 @@ class GoldTradingBot:
                         )
                 else:
                     logger.error(f"[FAILED] {symbol} PDE trade execution failed")
+                return
+
+            # ── 1.5. Trend-Adaptive Sweep Structure Mode (BUY 1:3 / SELL 1:2) ─
+            if mode in ['volume_profile', 'sweep_structure']:
+                sweep_cfg = getattr(config, 'SWEEP_STRUCTURE_SETTINGS', {})
+                tf = sweep_cfg.get('timeframe', '5m')
+                candle_count = 150
+                logger.info(f"  +- {symbol}: SWEEP STRUCTURE MODE - Fetching {candle_count} candles on {tf}...")
+                
+                df_sweep = executor.fetch_historical_data_mt5_symbol(symbol, tf, candle_count)
+                if df_sweep is None or len(df_sweep) < 40:
+                    logger.warning(f"  \\- {symbol}: Insufficient historical data on {tf} - SKIPPED")
+                    return
+                
+                if not hasattr(self, '_sweep_engine'):
+                    self._sweep_engine = SweepStructureStrategy(sweep_cfg)
+                
+                df_sweep = self._sweep_engine.generate_signals(df_sweep)
+                confirmed_bar = df_sweep.iloc[-2] if len(df_sweep) >= 2 else df_sweep.iloc[-1]
+                live_bar = df_sweep.iloc[-1]
+                
+                if confirmed_bar['signal'] == 0 or pd.isna(confirmed_bar.get('entry_price')):
+                    logger.info(f"  \\- {symbol}: No Sweep Structure signal on closed bar - NO TRADE")
+                    return
+                
+                bar_time = str(confirmed_bar.get('time', ''))
+                if not hasattr(self, '_last_sweep_trade_bars'):
+                    self._last_sweep_trade_bars = {}
+                if bar_time and self._last_sweep_trade_bars.get(symbol) == bar_time:
+                    logger.info(f"  \\- {symbol}: Sweep Structure signal on closed bar {bar_time} already executed - WAITING")
+                    return
+                
+                signal_direction = int(confirmed_bar['signal'])
+                signal_type = "BUY" if signal_direction > 0 else "SELL"
+                entry_price = float(confirmed_bar['entry_price'])
+                stop_loss = float(confirmed_bar['stop_loss'])
+                take_profit = float(confirmed_bar['take_profit'])
+                rr_ratio = float(confirmed_bar.get('rr_ratio', 2.0))
+                setup_name = str(confirmed_bar.get('setup_type', 'SWEEP_STRUCTURE'))
+                
+                logger.info(f"  +- {symbol}: [SWEEP SIGNAL TRIGGERED on CLOSED BAR {bar_time}] {signal_type} ({setup_name})! Entry: {entry_price:.5f}, SL: {stop_loss:.5f}, TP: {take_profit:.5f}, RR: {rr_ratio:.2f}")
+                
+                if not executor.check_correlation_risk(symbol, signal_direction):
+                    logger.info(f"  \\- {symbol}: Correlation risk too high for {signal_type} signal - BLOCKED")
+                    return
+                
+                if executor.get_open_positions():
+                    logger.warning(f"Trade signal ignored for {symbol} - position opened during analysis")
+                    return
+                
+                account_balance = executor.get_account_balance() or 2000.0
+                position_size = executor.calculate_dynamic_position_size(
+                    symbol, account_balance, entry_price, stop_loss
+                )
+                if not position_size or position_size <= 0:
+                    logger.warning(f"  \\- {symbol}: Position size calculation returned 0 - BLOCKED")
+                    return
+                
+                logger.info(f"[EXECUTING SWEEP STRUCTURE] {symbol} {signal_type} TRADE:")
+                logger.info(f"   Setup: {setup_name} | Lots: {position_size} | Entry: {entry_price:.5f} | SL: {stop_loss:.5f} | TP: {take_profit:.5f} | R:R: {rr_ratio:.2f}")
+                
+                trade_id = executor.execute_trade(
+                    signal_direction, entry_price, stop_loss, take_profit, position_size, setup_name
+                )
+                if trade_id:
+                    self._last_sweep_trade_bars[symbol] = bar_time
+                    logger.info(f"[SUCCESS] {symbol} Sweep Structure trade opened with ID: {trade_id}")
+                    if self.telegram.enabled:
+                        self.telegram.send_message(
+                            f"[SWEEP STRUCTURE TRADE EXECUTED] {signal_type} - {symbol}\n"
+                            f"Setup: {setup_name}\n"
+                            f"Entry: {entry_price:.5f}\n"
+                            f"SL: {stop_loss:.5f}\n"
+                            f"TP: {take_profit:.5f}\n"
+                            f"Lots: {position_size}\n"
+                            f"Trade ID: {trade_id}"
+                        )
+                else:
+                    logger.error(f"[FAILED] {symbol} Sweep Structure trade execution failed")
                 return
 
             # ── 2. Scalping / SMC Mode Fallback ──────────────────────────
