@@ -340,19 +340,29 @@ class MT5Executor:
             max_allowed_lot = float(symbol_config.get('max_lot_size') or global_risk_cfg.get('global_max_lot_size') or 0.10)
             final_position_size = min(position_size, max_allowed_lot)
 
+            # 7. ABSOLUTE HARD RISK ENFORCEMENT (Never exceed max_risk_amount)
+            contract_mult = 100.0 if ('XAU' in symbol or 'GOLD' in symbol.upper() or 'XAG' in symbol) else (1.0 if 'BTC' in symbol else 100000.0 * point)
+            actual_loss_usd = final_position_size * price_diff * contract_mult
+            actual_loss_acc = actual_loss_usd * usd_rate
+            
+            if max_money_risk is not None and float(max_money_risk) > 0 and actual_loss_acc > (float(max_money_risk) * 1.20):
+                logger.warning(
+                    f"[{symbol}] 🚨 TRADE BLOCKED BY HARD RISK POLICY: Potential Loss {actual_loss_acc:.2f} {account_currency} "
+                    f"exceeds Maximum Risk Limit of {float(max_money_risk):.2f} {account_currency} (SL Distance: {price_diff:.2f} pts). "
+                    f"Skipping trade to protect account equity."
+                )
+                return 0.0
+
             logger.info(
                 f"[{symbol}] Final Position Size: {final_position_size:.2f} lots "
-                f"(Risk: {risk_amount_acc:.2f} {account_currency} / ${risk_amount_usd:.2f} USD | "
-                f"SL Distance: {price_diff:.3f} pts | Max Cap: {max_allowed_lot:.2f} lots)"
+                f"(Risk: {actual_loss_acc:.2f} {account_currency} / ${actual_loss_usd:.2f} USD | "
+                f"Max Limit: {risk_amount_acc:.2f} {account_currency} | SL Distance: {price_diff:.3f} pts | Max Cap: {max_allowed_lot:.2f} lots)"
             )
             return round(final_position_size, 2)
             
         except Exception as e:
             logger.error(f"Error calculating position size: {str(e)}")
             return 0.01
-            
-        except Exception as e:
-            logger.error(f"Error calculating position size: {str(e)}")
             return volume_min or 0.01
     
     def check_risk_limits(self, new_symbol=None):

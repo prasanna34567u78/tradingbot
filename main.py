@@ -844,15 +844,14 @@ class GoldTradingBot:
                     logger.warning(f"Trade signal ignored for {symbol} - position opened during analysis")
                     return
                 
-                # Position Sizing
-                fixed_lot = symbol_config.get('fixed_lot_size')
-                if fixed_lot and fixed_lot > 0:
-                    position_size = float(fixed_lot)
-                else:
-                    account_balance = executor.get_account_balance() or 2000.0
-                    position_size = executor.calculate_dynamic_position_size(
-                        symbol, account_balance, entry_price, stop_loss
-                    )
+                # Position Sizing with Strict Max Risk Limit Enforcement
+                account_balance = executor.get_account_balance() or 2000.0
+                position_size = executor.calculate_dynamic_position_size(
+                    symbol, account_balance, entry_price, stop_loss
+                )
+                if not position_size or position_size <= 0:
+                    logger.warning(f"  \\- {symbol}: Position size calculation returned 0 - BLOCKED")
+                    return
                 
                 logger.info(f"[EXECUTING PDE] {symbol} {signal_type} TRADE:")
                 logger.info(f"   Zone: {zone_name} | Lots: {position_size} | Entry: {entry_price:.5f} | SL: {stop_loss:.5f} | TP: {take_profit:.5f} | R:R: {rr_ratio:.2f}")
@@ -1016,16 +1015,16 @@ class GoldTradingBot:
                     logger.error(f"Failed to get account balance for {symbol}")
                     return
                     
-                fixed_lot = symbol_config.get('fixed_lot_size') or symbol_config.get('lot_size')
-                if fixed_lot and float(fixed_lot) > 0:
-                    position_size = float(fixed_lot)
-                else:
-                    position_size = executor.calculate_dynamic_position_size(
-                        symbol,
-                        account_balance,
-                        high_quality_signal['entry_price'],
-                        high_quality_signal['stop_loss']
-                    )
+                # Position Sizing with Strict Max Risk Limit Enforcement
+                position_size = executor.calculate_dynamic_position_size(
+                    symbol,
+                    account_balance,
+                    high_quality_signal['entry_price'],
+                    high_quality_signal['stop_loss']
+                )
+                if not position_size or position_size <= 0:
+                    logger.warning(f"  \\- {symbol}: Position size calculation returned 0 - BLOCKED")
+                    return
                 
                 # Check Candle Lock: Only 1 trade allowed per candle bar
                 latest_bar_id = str(primary_df.iloc[-1].get('time', primary_df.index[-1]))
