@@ -224,12 +224,13 @@ class PDEStrategy:
                     rw_tp1   = take1 - entry
                     rw_tp2   = take2 - entry
 
-                    if risk > 0 and rw_tp2 / risk >= self.min_rr:
+                    if risk > 0 and (rw_tp1 / risk >= self.min_rr or rw_tp2 / risk >= self.min_rr):
                         df.iloc[i, df.columns.get_loc("signal")]      = 1
                         df.iloc[i, df.columns.get_loc("entry_price")] = round(entry, 5)
                         df.iloc[i, df.columns.get_loc("sl")]          = round(stop,  5)
                         df.iloc[i, df.columns.get_loc("tp1")]         = round(take1, 5)
                         df.iloc[i, df.columns.get_loc("tp2")]         = round(take2, 5)
+                        df.iloc[i, df.columns.get_loc("take_profit")] = round(take1, 5) # Default to high-probability Equilibrium TP1
                         df.iloc[i, df.columns.get_loc("rr_tp1")]      = round(rw_tp1 / risk, 2)
                         df.iloc[i, df.columns.get_loc("rr_tp2")]      = round(rw_tp2 / risk, 2)
                         last_sig_bar = i
@@ -258,12 +259,13 @@ class PDEStrategy:
                     rw_tp1   = entry - take1
                     rw_tp2   = entry - take2
 
-                    if risk > 0 and rw_tp2 / risk >= self.min_rr:
+                    if risk > 0 and (rw_tp1 / risk >= self.min_rr or rw_tp2 / risk >= self.min_rr):
                         df.iloc[i, df.columns.get_loc("signal")]      = -1
                         df.iloc[i, df.columns.get_loc("entry_price")] = round(entry, 5)
                         df.iloc[i, df.columns.get_loc("sl")]          = round(stop,  5)
                         df.iloc[i, df.columns.get_loc("tp1")]         = round(take1, 5)
                         df.iloc[i, df.columns.get_loc("tp2")]         = round(take2, 5)
+                        df.iloc[i, df.columns.get_loc("take_profit")] = round(take1, 5) # Default to high-probability Equilibrium TP1
                         df.iloc[i, df.columns.get_loc("rr_tp1")]      = round(rw_tp1 / risk, 2)
                         df.iloc[i, df.columns.get_loc("rr_tp2")]      = round(rw_tp2 / risk, 2)
                         last_sig_bar = i

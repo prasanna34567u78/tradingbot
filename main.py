@@ -828,8 +828,8 @@ class GoldTradingBot:
                 signal_type = "BUY" if signal_direction > 0 else "SELL"
                 entry_price = float(live_bar['close'])  # Execute at current live market price
                 stop_loss = float(confirmed_bar.get('stop_loss', confirmed_bar.get('sl', 0.0)))
-                take_profit = float(confirmed_bar.get('take_profit', confirmed_bar.get('tp2', confirmed_bar.get('tp1', 0.0))))
-                rr_ratio = float(confirmed_bar.get('rr_tp2', 1.5))
+                take_profit = float(confirmed_bar.get('take_profit', confirmed_bar.get('tp1', confirmed_bar.get('tp2', 0.0))))
+                rr_ratio = float(confirmed_bar.get('rr_tp1', confirmed_bar.get('rr_tp2', 1.5)))
                 zone_name = str(confirmed_bar.get('pde_zone', ''))
 
                 # ── Fix 1: PDE Macro 1H/4H HTF Trend Guard ──────────────────
