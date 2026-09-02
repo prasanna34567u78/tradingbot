@@ -52,10 +52,11 @@ class SweepStructureStrategy:
         c = df['close'].values
         o = df['open'].values
 
-        # Determine time / hour
-        if 'time' in df.columns:
-            df['time_dt'] = pd.to_datetime(df['time'])
-            hours = df['time_dt'].dt.hour.values
+        # Determine time / hour (Robust support for DatetimeIndex and 'time' column)
+        if isinstance(df.index, pd.DatetimeIndex):
+            hours = df.index.hour.values
+        elif 'time' in df.columns:
+            hours = pd.to_datetime(df['time']).dt.hour.values
         else:
             hours = np.zeros(n, dtype=int)
 
