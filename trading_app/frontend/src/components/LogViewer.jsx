@@ -35,6 +35,7 @@ export const LogViewer = () => {
   const setAutoScroll = useLogStore((state) => state.setAutoScroll);
   const setLogRetention = useLogStore((state) => state.setLogRetention);
   const logRetention = useLogStore((state) => state.logRetention);
+  const clearLogs = useLogStore((state) => state.clearLogs);
   const activityFeed = useAnalyticsStore((state) => state.activityFeed) || [];
   const fetchAnalytics = useAnalyticsStore((state) => state.fetchAnalytics);
 
