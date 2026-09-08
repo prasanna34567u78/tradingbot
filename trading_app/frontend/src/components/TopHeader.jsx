@@ -159,14 +159,6 @@ export const TopHeader = ({ onOpenGemini, onToggleMobileMenu }) => {
                 : formatCurrency(account.daily_pnl, currency)}
             </span>
           </div>
-
-          <button
-            onClick={() => setIsEditAccountOpen(true)}
-            className="ml-2 p-1.5 bg-borderColor/60 hover:bg-borderColor text-gray-300 hover:text-white rounded-lg transition"
-            title="Edit Account Details"
-          >
-            <Edit3 size={14} />
-          </button>
         </div>
 
         {/* Right: Bot Control & Gemini Button */}

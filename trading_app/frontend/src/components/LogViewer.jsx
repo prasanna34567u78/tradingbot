@@ -35,9 +35,14 @@ export const LogViewer = () => {
   const setAutoScroll = useLogStore((state) => state.setAutoScroll);
   const setLogRetention = useLogStore((state) => state.setLogRetention);
   const logRetention = useLogStore((state) => state.logRetention);
-  const clearLogs = useLogStore((state) => state.clearLogs);
+  const activityFeed = useAnalyticsStore((state) => state.activityFeed) || [];
+  const fetchAnalytics = useAnalyticsStore((state) => state.fetchAnalytics);
 
-  const activityFeed = useAnalyticsStore((state) => state.activityFeed);
+  useEffect(() => {
+    if (fetchAnalytics) {
+      fetchAnalytics();
+    }
+  }, []);
 
   const logContainerRef = useRef(null);
 
@@ -146,8 +151,44 @@ export const LogViewer = () => {
     ? filteredLogs
     : filteredLogs.slice((logPage - 1) * Number(pageSize), logPage * Number(pageSize));
 
+  // Synthesize Trade Events from both activityFeed AND trade logs from logs store
+  const combinedTradeEvents = React.useMemo(() => {
+    const list = [...(activityFeed || [])];
+    const seen = new Set(list.map((e) => `${e.time}_${e.symbol}_${e.detail}`));
+
+    // Parse logs for trade events
+    (logs || []).forEach((l) => {
+      const msg = l.message || '';
+      const lvl = l.level || '';
+      const isTradeLog = lvl === 'TRADE_OPEN' || lvl === 'TRADE_CLOSE' || 
+                         msg.includes('Opened') || msg.includes('Closed') || 
+                         msg.includes('Executing BUY') || msg.includes('Executing SELL') || 
+                         msg.includes('Trade Closed') || msg.includes('Trade opened');
+      if (isTradeLog) {
+        let sym = 'XAUUSDm';
+        ['BTCUSDm', 'USOILm', 'EURUSDm', 'GBPUSDm', 'XAUUSDm'].forEach((s) => {
+          if (msg.includes(s)) sym = s;
+        });
+        const dir = msg.toUpperCase().includes('BUY') ? 'BUY' : (msg.toUpperCase().includes('SELL') ? 'SELL' : 'INFO');
+        const key = `${l.timestamp}_${sym}_${msg}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          list.push({
+            time: l.timestamp,
+            symbol: sym,
+            direction: dir,
+            detail: msg,
+            date: l.timestamp?.split(' ')[0]
+          });
+        }
+      }
+    });
+
+    return list;
+  }, [activityFeed, logs]);
+
   // Trade Events Filter & Pagination
-  const filteredEvents = activityFeed.filter((evt) => {
+  const filteredEvents = combinedTradeEvents.filter((evt) => {
     const matchesDir = eventDirectionFilter === 'ALL' || evt.direction === eventDirectionFilter;
     const matchesSearch = !eventSearch || 
       evt.symbol?.toLowerCase().includes(eventSearch.toLowerCase()) ||
