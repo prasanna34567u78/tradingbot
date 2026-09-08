@@ -605,6 +605,27 @@ class GoldTradingBot:
                           f"Current SL: {trade_info['stop_loss']}, "
                           f"Profit: {profit_display}")
                 
+                # Check for Pre-London Auto-Close Safeguard (06:45 - 07:00 UTC)
+                # Closes any active Asian session positions before volatile London session open
+                from datetime import datetime, timezone
+                now_utc = datetime.now(timezone.utc)
+                is_pre_london = (now_utc.hour == 6 and now_utc.minute >= 45) or (now_utc.hour == 7 and now_utc.minute == 0)
+                if is_pre_london:
+                    logger.info(f"{symbol} - 🛡️ PRE-LONDON CLOSE TRIGGERED (06:45 UTC). Closing trade before London open to protect profit/capital.")
+                    position_size = trade_info.get('volume', None)
+                    if position_size and executor.close_trade(trade_id, position_size, "Pre-London Safeguard Close"):
+                        exit_price = current_price['bid'] if trade_info['side'] == 'buy' else current_price['ask']
+                        self._log_trade_result(trade_info, exit_price, df, symbol)
+                        if self.telegram.enabled:
+                            self.telegram.send_message(
+                                f"🛡️ Pre-London Safeguard Close - {symbol}\n"
+                                f"Closed at: {exit_price:.5f}\n"
+                                f"Profit: {profit_display}\n"
+                                f"Reason: Protected capital before volatile London session open."
+                            )
+                    strategy.set_current_trade(None)
+                    return
+
                 # Check if we should exit based on market conditions (Exempt PDE & Scalping to let TP/SL/Trailing do their jobs)
                 is_pde_or_scalp = (
                     getattr(config, 'STRATEGY_MODE', '').lower() in ['pde', 'scalping'] or

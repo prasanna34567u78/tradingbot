@@ -52,13 +52,17 @@ class SweepStructureStrategy:
         c = df['close'].values
         o = df['open'].values
 
-        # Determine time / hour (Robust support for DatetimeIndex and 'time' column)
+        # Determine time / hour / minute (Robust support for DatetimeIndex and 'time' column)
         if isinstance(df.index, pd.DatetimeIndex):
             hours = df.index.hour.values
+            minutes = df.index.minute.values
         elif 'time' in df.columns:
-            hours = pd.to_datetime(df['time']).dt.hour.values
+            t_dt = pd.to_datetime(df['time'])
+            hours = t_dt.dt.hour.values
+            minutes = t_dt.dt.minute.values
         else:
             hours = np.zeros(n, dtype=int)
+            minutes = np.zeros(n, dtype=int)
 
         # Precompute ATR & EMAs
         tr = np.zeros(n)
@@ -77,8 +81,13 @@ class SweepStructureStrategy:
 
         for i in range(30, n):
             hr = hours[i]
-            if self.session_filter and hr not in self.allowed_hours:
-                continue
+            mn = minutes[i]
+            if self.session_filter:
+                if hr not in self.allowed_hours:
+                    continue
+                # Block new Asian entries 30 mins before London (after 06:30 UTC) to avoid stop-hunts
+                if hr == 6 and mn >= 30:
+                    continue
 
             a = atr[i]
             if a <= 0.15:

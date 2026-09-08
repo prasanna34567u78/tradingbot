@@ -3,13 +3,18 @@ import { useLogStore } from '../store/logStore';
 import { useAnalyticsStore } from '../store/analyticsStore';
 import { 
   Search, Download, Trash2, Pause, Play, Terminal, Zap, Bot, Cpu, Inbox, 
-  ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter 
+  ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, Calendar 
 } from 'lucide-react';
 
 export const LogViewer = () => {
   const [activeTab, setActiveTab] = useState('bot_logs');
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [sortOrder, setSortOrder] = useState('newest'); // 'newest' (top) or 'oldest'
+
+  // Date/Time Filter State
+  const [timeFilter, setTimeFilter] = useState('ALL'); // 'ALL', 'today', 'yesterday', 'week', 'custom'
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   // Log Pagination State
   const [logPage, setLogPage] = useState(1);
@@ -79,12 +84,58 @@ export const LogViewer = () => {
     }
   };
 
+  // Date Filtering Helper
+  const matchesDateFilter = (itemTime) => {
+    if (timeFilter === 'ALL' || !itemTime) return true;
+
+    // Normalise date
+    let itemDate = null;
+    const str = String(itemTime).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+      itemDate = new Date(str);
+    } else {
+      // Handles time-only stamps like "14:23:05" or "2:23:05 PM" -> treat as today
+      const now = new Date();
+      itemDate = new Date(`${now.toISOString().slice(0, 10)} ${str}`);
+    }
+
+    if (isNaN(itemDate.getTime())) return true;
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    const yesterdayEnd = new Date(todayStart);
+
+    if (timeFilter === 'today') {
+      return itemDate >= todayStart;
+    } else if (timeFilter === 'yesterday') {
+      return itemDate >= yesterdayStart && itemDate < yesterdayEnd;
+    } else if (timeFilter === 'week') {
+      const weekAgo = new Date(todayStart);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return itemDate >= weekAgo;
+    } else if (timeFilter === 'custom') {
+      if (customStartDate) {
+        const start = new Date(customStartDate + 'T00:00:00');
+        if (itemDate < start) return false;
+      }
+      if (customEndDate) {
+        const end = new Date(customEndDate + 'T23:59:59');
+        if (itemDate > end) return false;
+      }
+      return true;
+    }
+    return true;
+  };
+
   const rawFilteredLogs = logs.filter((log) => {
     const matchesLevel = levelFilter === 'ALL' || log.level === levelFilter;
     const matchesSearch = !searchQuery || 
       log.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (log.timestamp && log.timestamp.includes(searchQuery));
-    return matchesLevel && matchesSearch;
+    const matchesDate = matchesDateFilter(log.timestamp);
+    return matchesLevel && matchesSearch && matchesDate;
   });
 
   const filteredLogs = sortOrder === 'newest' ? [...rawFilteredLogs].reverse() : rawFilteredLogs;
@@ -102,7 +153,8 @@ export const LogViewer = () => {
       evt.symbol?.toLowerCase().includes(eventSearch.toLowerCase()) ||
       evt.detail?.toLowerCase().includes(eventSearch.toLowerCase()) ||
       evt.time?.includes(eventSearch);
-    return matchesDir && matchesSearch;
+    const matchesDate = matchesDateFilter(evt.time);
+    return matchesDir && matchesSearch && matchesDate;
   });
 
   const totalEventPages = Math.max(1, Math.ceil(filteredEvents.length / eventPageSize));
@@ -199,6 +251,51 @@ export const LogViewer = () => {
                 </button>
               ))}
             </div>
+
+            {/* Date/Time Filter Tabs */}
+            <div className="flex items-center gap-1 bg-darkBg border border-borderColor rounded-xl p-0.5">
+              {[
+                { id: 'ALL', label: 'All Time' },
+                { id: 'today', label: 'Today' },
+                { id: 'yesterday', label: 'Yesterday' },
+                { id: 'week', label: 'Last 7 Days' },
+                { id: 'custom', label: 'Custom' }
+              ].map((tf) => (
+                <button
+                  key={tf.id}
+                  onClick={() => setTimeFilter(tf.id)}
+                  className={`px-2 py-1 rounded-lg font-mono font-semibold text-[11px] transition ${
+                    timeFilter === tf.id
+                      ? 'bg-accentGreen text-darkBg font-bold shadow'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {tf.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Date Pickers (visible if custom is selected) */}
+            {timeFilter === 'custom' && (
+              <div className="flex items-center gap-1 bg-darkBg border border-borderColor rounded-xl px-2 py-1">
+                <Calendar size={12} className="text-gray-400" />
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="bg-transparent text-white text-[11px] font-mono focus:outline-none"
+                  title="Start Date"
+                />
+                <span className="text-gray-500 text-xs">to</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="bg-transparent text-white text-[11px] font-mono focus:outline-none"
+                  title="End Date"
+                />
+              </div>
+            )}
 
             {/* Search Input */}
             <div className="relative flex-1 max-w-xs">
@@ -421,6 +518,51 @@ export const LogViewer = () => {
                 </button>
               ))}
             </div>
+
+            {/* Date/Time Filter Tabs for Trade Events */}
+            <div className="flex items-center gap-1 bg-darkBg border border-borderColor rounded-xl p-0.5">
+              {[
+                { id: 'ALL', label: 'All Time' },
+                { id: 'today', label: 'Today' },
+                { id: 'yesterday', label: 'Yesterday' },
+                { id: 'week', label: 'Last 7 Days' },
+                { id: 'custom', label: 'Custom' }
+              ].map((tf) => (
+                <button
+                  key={tf.id}
+                  onClick={() => setTimeFilter(tf.id)}
+                  className={`px-2 py-1 rounded-lg font-mono font-semibold text-[11px] transition ${
+                    timeFilter === tf.id
+                      ? 'bg-accentGreen text-darkBg font-bold shadow'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {tf.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Date Pickers (visible if custom is selected) */}
+            {timeFilter === 'custom' && (
+              <div className="flex items-center gap-1 bg-darkBg border border-borderColor rounded-xl px-2 py-1">
+                <Calendar size={12} className="text-gray-400" />
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="bg-transparent text-white text-[11px] font-mono focus:outline-none"
+                  title="Start Date"
+                />
+                <span className="text-gray-500 text-xs">to</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="bg-transparent text-white text-[11px] font-mono focus:outline-none"
+                  title="End Date"
+                />
+              </div>
+            )}
 
             <div className="relative flex-1 max-w-xs">
               <Search size={14} className="absolute left-2.5 top-2.5 text-gray-500" />

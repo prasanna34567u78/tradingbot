@@ -122,17 +122,6 @@ export const EditAccountModal = ({ isOpen, onClose }) => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-gray-300 font-semibold mb-1">Daily P&L ($)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={dailyPnl}
-              onChange={(e) => setDailyPnl(e.target.value)}
-              className="w-full bg-darkBg border border-borderColor rounded-xl px-3 py-2 text-white font-mono"
-            />
-          </div>
-
           <button
             type="submit"
             disabled={loading}
