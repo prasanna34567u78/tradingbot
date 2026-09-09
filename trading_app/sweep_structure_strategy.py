@@ -38,9 +38,10 @@ class SweepStructureStrategy:
         # 3 Winning Sessions: Asian (00-07 UTC), NY Power (13-18 UTC), Overnight (18-00 UTC)
         self.allowed_hours = set(range(0, 7)) | set(range(13, 24))
 
-    def generate_signals(self, df: pd.DataFrame) -> pd.DataFrame:
+    def generate_signals(self, df: pd.DataFrame, df_1h: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """
         Processes OHLCV dataframe and marks BUY (+1) or SELL (-1) signals on confirmed closed bars.
+        Optionally accepts df_1h for 1-Hour Higher Timeframe (HTF) EMA 200 trend alignment.
         """
         if df is None or len(df) < 50:
             return df
@@ -72,6 +73,16 @@ class SweepStructureStrategy:
         e50 = pd.Series(c).ewm(span=50, adjust=False).mean().values
         e200 = pd.Series(c).ewm(span=200, adjust=False).mean().values
 
+        # Compute HTF 1-Hour EMA 200 if df_1h is provided
+        htf_ema_val = np.nan
+        if df_1h is not None and len(df_1h) >= 50:
+            try:
+                c_1h = df_1h['close'].values
+                htf_ema_series = pd.Series(c_1h).ewm(span=200, adjust=False).mean()
+                htf_ema_val = float(htf_ema_series.iloc[-1])
+            except Exception as e:
+                logger.warning(f"Error computing HTF EMA 200: {e}")
+
         signals = np.zeros(n, dtype=int)
         entry_prices = np.full(n, np.nan)
         stop_losses = np.full(n, np.nan)
@@ -93,8 +104,17 @@ class SweepStructureStrategy:
             if a <= 0.15:
                 continue
 
+            # 5M Trend Direction
             macro_bull = e50[i] > e200[i]
             macro_bear = e50[i] < e200[i]
+
+            # 1-Hour HTF EMA 200 Alignment (Setup 2):
+            # Block BUYs if price is below 1H EMA 200; Block SELLs if price is above 1H EMA 200
+            if not np.isnan(htf_ema_val):
+                if c[i] < htf_ema_val:
+                    macro_bull = False
+                if c[i] > htf_ema_val:
+                    macro_bear = False
 
             buy_setup = False
             sell_setup = False

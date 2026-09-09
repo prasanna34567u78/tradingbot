@@ -929,17 +929,20 @@ class GoldTradingBot:
                 sweep_cfg = getattr(config, 'SWEEP_STRUCTURE_SETTINGS', {})
                 tf = sweep_cfg.get('timeframe', '5m')
                 candle_count = 150
-                logger.info(f"  +- {symbol}: SWEEP STRUCTURE MODE - Fetching {candle_count} candles on {tf}...")
+                logger.info(f"  +- {symbol}: SWEEP STRUCTURE MODE - Fetching {candle_count} candles on {tf} & 1H HTF candles...")
                 
                 df_sweep = executor.fetch_historical_data_mt5_symbol(symbol, tf, candle_count)
                 if df_sweep is None or len(df_sweep) < 40:
                     logger.warning(f"  \\- {symbol}: Insufficient historical data on {tf} - SKIPPED")
                     return
                 
+                # Fetch 1-Hour candles for genuine HTF EMA 200 trend alignment
+                df_1h = executor.fetch_historical_data_mt5_symbol(symbol, '1h', 250)
+                
                 if not hasattr(self, '_sweep_engine'):
                     self._sweep_engine = SweepStructureStrategy(sweep_cfg)
                 
-                df_sweep = self._sweep_engine.generate_signals(df_sweep)
+                df_sweep = self._sweep_engine.generate_signals(df_sweep, df_1h=df_1h)
                 confirmed_bar = df_sweep.iloc[-2] if len(df_sweep) >= 2 else df_sweep.iloc[-1]
                 live_bar = df_sweep.iloc[-1]
                 
