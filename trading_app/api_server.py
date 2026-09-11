@@ -18,6 +18,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+import config
+
 try:
     import MetaTrader5 as mt5
     import pandas as pd
@@ -319,13 +321,15 @@ def fetch_account_data() -> Dict[str, Any]:
     if override_enabled == 0 and can_try_mt5():
         try:
             mt5_path = r"C:\Program Files\MetaTrader 5\terminal64.exe"
-            login_id = int(os.getenv("MT5_LOGIN", 0) or 0)
-            password = str(os.getenv("MT5_PASSWORD", ""))
-            server = str(os.getenv("MT5_SERVER", ""))
+            login_id = int(os.getenv("MT5_LOGIN", 0) or getattr(config, "MT5_LOGIN", 0) or 0)
+            password = str(os.getenv("MT5_PASSWORD", "") or getattr(config, "MT5_PASSWORD", ""))
+            server = str(os.getenv("MT5_SERVER", "") or getattr(config, "MT5_SERVER", ""))
 
             init_ok = mt5.initialize(path=mt5_path) if os.path.exists(mt5_path) else mt5.initialize()
             if init_ok:
-                mt5.login(login_id, password, server)
+                # If credentials exist, log in. Otherwise use active terminal session.
+                if login_id > 0 and password:
+                    mt5.login(login_id, password, server)
                 info = mt5.account_info()
                 if info is not None:
                     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
