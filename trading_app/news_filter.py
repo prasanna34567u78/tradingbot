@@ -9,6 +9,7 @@ Supports caching and graceful offline fallback.
 import time
 import json
 import logging
+import ssl
 import urllib.request
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
@@ -48,11 +49,16 @@ class EconomicNewsFilter:
             return
 
         try:
+            # Create SSL context to bypass Windows missing CA root certificates
+            ssl_ctx = ssl.create_default_context()
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
+
             req = urllib.request.Request(
                 self.calendar_url,
                 headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
             )
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            with urllib.request.urlopen(req, timeout=8, context=ssl_ctx) as resp:
                 raw = resp.read().decode('utf-8')
                 data = json.loads(raw)
                 
