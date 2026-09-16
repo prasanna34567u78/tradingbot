@@ -28,6 +28,7 @@ from indicators import SMCIndicators
 from strategy import SMCStrategy
 from trade_quality_improvement import TradeQualityFilter, EnhancedSignalGenerator
 from sweep_structure_strategy import SweepStructureStrategy
+from news_filter import EconomicNewsFilter
 
 # from webhook_listener import WebhookListener
 from logger import TradeLogger
@@ -408,6 +409,8 @@ class GoldTradingBot:
         self.last_correlation_update = 0
         self.symbol_cooldowns = {}       # symbol -> timestamp when cooldown ends
         self.last_traded_candle = {}     # symbol -> last candle timestamp traded on
+        self.last_known_trades = {}      # symbol -> previous open trades dict to detect broker SL hits
+        self.news_filter = EconomicNewsFilter(buffer_before_minutes=30, buffer_after_minutes=30)
         
         # Initialize scheduler
         self.scheduler = BackgroundScheduler()
@@ -706,7 +709,47 @@ class GoldTradingBot:
                             msg += f"New TP: {trailing_result['take_profit']:.5f}\n"
                         msg += f"Current Profit: {profit_display}"
                         self.telegram.send_message(msg)
+                
+                # Update last known open trades for next cycle comparison
+                self.last_known_trades[symbol] = dict(trades)
             else:
+                # Position was open previously but is now closed by MT5 broker (e.g. SL or TP hit)
+                prev_trades = self.last_known_trades.get(symbol, {})
+                if prev_trades:
+                    logger.info(f"[{symbol}] Position closed on broker side (SL/TP or Manual). Querying MT5 deal outcome...")
+                    import MetaTrader5 as mt5
+                    from datetime import datetime, timedelta
+                    deals = mt5.history_deals_get(datetime.now() - timedelta(minutes=10), datetime.now())
+                    realized_pnl = 0.0
+                    if deals:
+                        symbol_deals = [d for d in deals if d.symbol == symbol and d.entry == 1]
+                        if symbol_deals:
+                            last_deal = symbol_deals[-1]
+                            realized_pnl = float(last_deal.profit + last_deal.swap + last_deal.commission)
+                    
+                    now_t = time.time()
+                    if realized_pnl < 0:
+                        # Enforce mandatory 5-minute (300s) cooldown to prevent revenge churn on whipsaws
+                        self.symbol_cooldowns[symbol] = now_t + 300
+                        logger.warning(f"[{symbol}] 🛡️ Broker SL Hit: Loss ${realized_pnl:.2f}. Mandatory 5-Minute (300s) Cooldown ENFORCED.")
+                        if self.telegram.enabled:
+                            self.telegram.send_message(
+                                f"🛡️ SL Hit - {symbol}\n"
+                                f"Loss: ${abs(realized_pnl):.2f}\n"
+                                f"Cooldown: 5 minutes active (preventing churn)."
+                            )
+                    else:
+                        self.symbol_cooldowns[symbol] = now_t + 90
+                        logger.info(f"[{symbol}] 🎯 Broker TP Hit: Win +${realized_pnl:.2f}. 90s cooldown active.")
+                        if self.telegram.enabled:
+                            self.telegram.send_message(
+                                f"🎯 TP Hit - {symbol}\n"
+                                f"Profit: +${realized_pnl:.2f}\n"
+                                f"Cooldown: 90s active."
+                            )
+
+                    self.last_known_trades[symbol] = {}
+
                 strategy.set_current_trade(None)
                 
         except Exception as e:
@@ -755,6 +798,13 @@ class GoldTradingBot:
                 remaining_s = int(self.symbol_cooldowns[symbol] - now_ts)
                 logger.info(f"  \\- {symbol}: In post-trade cooldown ({remaining_s}s remaining) - SKIPPED")
                 return
+
+            # 0.5. Check High-Impact Economic News Blackout (e.g. FOMC, CPI, NFP)
+            if hasattr(self, 'news_filter') and self.news_filter:
+                is_blackout, news_detail = self.news_filter.is_news_blackout(symbol)
+                if is_blackout:
+                    logger.warning(f"  \\- {symbol}: 🛡️ HIGH-IMPACT NEWS BLACKOUT ACTIVE! ({news_detail}) - SKIPPED")
+                    return
             
             # Check global risk limits
             if not self.check_global_risk_limits():
@@ -950,7 +1000,7 @@ class GoldTradingBot:
                     logger.info(f"  \\- {symbol}: No Sweep Structure signal on closed bar - NO TRADE")
                     return
                 
-                bar_time = str(confirmed_bar.get('time', ''))
+                bar_time = str(confirmed_bar.name) if isinstance(df_sweep.index, pd.DatetimeIndex) else str(confirmed_bar.get('time', ''))
                 if not hasattr(self, '_last_sweep_trade_bars'):
                     self._last_sweep_trade_bars = {}
                 if bar_time and self._last_sweep_trade_bars.get(symbol) == bar_time:
