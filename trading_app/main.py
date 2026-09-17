@@ -507,14 +507,17 @@ class GoldTradingBot:
             logger.info(f"[{symbol}] Trade LOSS ({profit:.2f}) - 5-Minute (300s) Cooldown active to let market settle.")
 
         # Log trade result
-        logger.info(f"{symbol} trade completed - Profit: {profit:.2f}, Success: {profitable}")
+        executor = self.executors.get(symbol)
+        curr = executor.get_account_currency() if executor else "INR"
+        curr_sym = "₹" if curr in ["INR", "RS", "RUPEES"] else ("$" if curr == "USD" else f"{curr} ")
+        logger.info(f"{symbol} trade completed - Profit: {curr_sym}{profit:.2f}, Success: {profitable}")
         
         # Send notification
         if self.telegram.enabled:
             status = "PROFIT" if profitable else "LOSS"
             self.telegram.send_message(
                 f"{status} - {symbol} Trade Closed\n"
-                f"Result: {'Profit' if profitable else 'Loss'}: {abs(profit):.2f}\n"
+                f"Result: {'Profit' if profitable else 'Loss'}: {curr_sym}{abs(profit):.2f}\n"
                 f"Entry: {entry_price:.2f}\n"
                 f"Exit: {exit_price:.2f}\n"
                 f"Cooldown: {'90s' if profitable else '5m'}"
@@ -584,19 +587,9 @@ class GoldTradingBot:
                 profit = price - trade_info['entry_price'] if trade_info['side'] == 'buy' else trade_info['entry_price'] - price
                 
                 # Calculate profit in pips for better display
-                if 'USD' in symbol and symbol.endswith('m'):
-                    # For forex pairs, convert to pips (0.0001)
-                    profit_pips = profit * 10000
-                    profit_display = f"{profit:.5f} ({profit_pips:+.1f} pips)"
-                elif 'XAU' in symbol or 'GOLD' in symbol.upper():
-                    # For gold, convert to cents
-                    profit_cents = profit * 100
-                    profit_display = f"{profit:.2f} (${profit_cents:+.2f})"
-                elif 'BTC' in symbol:
-                    # For BTC, show in USD
-                    profit_display = f"${profit:+.2f}"
-                else:
-                    profit_display = f"{profit:+.5f}"
+                curr = executor.get_account_currency() if executor else "INR"
+                curr_sym = "₹" if curr in ["INR", "RS", "RUPEES"] else ("$" if curr == "USD" else f"{curr} ")
+                profit_display = f"{curr_sym}{profit:+.2f}"
                 
                 # Get MCP AI validation of current market conditions & spread risk
                 validation = strategy.ai_analyzer.mcp_validate_trade(df, 1 if trade_info['side'] == 'buy' else -1, symbol=symbol)

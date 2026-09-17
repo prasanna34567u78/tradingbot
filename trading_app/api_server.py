@@ -41,6 +41,22 @@ app.add_middleware(
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.py")
 DB_PATH = os.path.join(os.path.dirname(__file__), "trades.db")
 
+def get_currency_symbol(currency: str = "INR") -> str:
+    c = str(currency or "INR").upper().strip()
+    if c in ["INR", "RS", "RUPEES"]:
+        return "₹"
+    elif c == "USD":
+        return "$"
+    elif c == "EUR":
+        return "€"
+    elif c == "GBP":
+        return "£"
+    elif c == "JPY":
+        return "¥"
+    elif c == "AED":
+        return "AED "
+    return f"{c} "
+
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -495,13 +511,15 @@ def fetch_real_history_and_analytics():
                                 "trade": "win" if profit >= 0 else "loss"
                             })
 
+                            acc = fetch_account_data()
+                            curr_sym = get_currency_symbol(acc.get("currency", "INR"))
                             recent_activity.append({
                                 "time": datetime.fromtimestamp(out_deal.time).strftime("%Y-%m-%d %H:%M:%S"),
                                 "date": datetime.fromtimestamp(out_deal.time).strftime("%Y-%m-%d"),
                                 "type": "close_profit" if profit >= 0 else "close_loss",
                                 "symbol": sym,
                                 "direction": direction,
-                                "detail": f"{'+' if profit >= 0 else ''}${profit:.2f} (Entry: {in_deal.price}, Exit: {out_deal.price})"
+                                "detail": f"{'+' if profit >= 0 else ''}{curr_sym}{profit:.2f} (Entry: {in_deal.price}, Exit: {out_deal.price})"
                             })
                         elif in_deal:
                             direction = "BUY" if in_deal.type == 0 else "SELL"
@@ -893,8 +911,10 @@ def update_account(req: AccountUpdateRequest):
     """, (req.balance, req.equity, req.margin, req.free_margin, req.daily_pnl, req.override_enabled, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     conn.commit()
     conn.close()
-    append_log("SUCCESS", f"Account updated: Balance ${req.balance:.2f}, Equity ${req.equity:.2f}.")
-    return {"status": "success", "account": fetch_account_data()}
+    acc_data = fetch_account_data()
+    curr_sym = get_currency_symbol(acc_data.get("currency", "INR"))
+    append_log("SUCCESS", f"Account updated: Balance {curr_sym}{req.balance:.2f}, Equity {curr_sym}{req.equity:.2f}.")
+    return {"status": "success", "account": acc_data}
 
 @app.get("/api/positions")
 def get_positions():
@@ -1627,9 +1647,10 @@ def ai_command(req: AICommandRequest):
         }
     else:
         acc = fetch_account_data()
+        curr_sym = get_currency_symbol(acc.get("currency", "INR"))
         return {
             "type": "chat_response",
-            "message": f"Account Balance: ${acc['balance']:.2f}, Equity: ${acc['equity']:.2f}. Market reasoning for '{req.command}'."
+            "message": f"Account Balance: {curr_sym}{acc['balance']:.2f}, Equity: {curr_sym}{acc['equity']:.2f}. Market reasoning for '{req.command}'."
         }
 
 def get_ws_snapshot():

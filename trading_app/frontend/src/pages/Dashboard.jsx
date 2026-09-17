@@ -63,7 +63,7 @@ export const Dashboard = () => {
   const totalFeedPages = Math.max(1, Math.ceil(filteredFeed.length / feedPageSize));
   const displayedFeed = filteredFeed.slice((feedPage - 1) * feedPageSize, feedPage * feedPageSize);
 
-  const currency = account?.currency || 'USD';
+  const currency = account?.currency || 'INR';
 
   return (
     <div className="space-y-5 sm:space-y-6 pb-12">

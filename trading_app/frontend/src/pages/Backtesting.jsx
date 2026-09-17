@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { runBacktest, getBacktestStatus } from '../api/tradingApi';
 import { useConfigStore } from '../store/configStore';
+import { useAccountStore } from '../store/accountStore';
+import { getCurrencySymbol, formatCurrency } from '../utils/formatters';
 import { Play, Download, BarChart2, Database, Cpu, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
 
 export const Backtesting = () => {
   const config = useConfigStore((state) => state.config);
+  const currency = useAccountStore((state) => state.account?.currency || 'INR');
+  const currSym = getCurrencySymbol(currency);
 
   // Pull symbols from config or fallback defaults
   const configSymbols = config?.SYMBOLS
@@ -217,7 +221,7 @@ export const Backtesting = () => {
         {/* Initial Balance & Lots */}
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-gray-300 font-semibold mb-1">Initial Balance ($)</label>
+            <label className="block text-gray-300 font-semibold mb-1">Initial Balance ({currSym})</label>
             <input
               type="number"
               value={initialBalance}
@@ -294,7 +298,7 @@ export const Backtesting = () => {
               {[
                 {
                   label: 'Total P&L',
-                  value: `${results.metrics.total_profit >= 0 ? '+' : ''}$${results.metrics.total_profit}`,
+                  value: `${results.metrics.total_profit >= 0 ? '+' : ''}${formatCurrency(results.metrics.total_profit, currency)}`,
                   color: results.metrics.total_profit >= 0 ? 'text-accentGreen' : 'text-accentRed',
                   bg: results.metrics.total_profit >= 0 ? 'border-accentGreen/20' : 'border-accentRed/20',
                 },
@@ -306,7 +310,7 @@ export const Backtesting = () => {
                 ...(strategy === 'crypto_vpp_v2' && results.metrics.sortino_ratio !== undefined ? [
                   { label: 'Sortino Ratio', value: results.metrics.sortino_ratio ?? '—', color: 'text-cyan-400', bg: '' },
                   { label: 'Calmar Ratio', value: results.metrics.calmar_ratio ?? '—', color: 'text-amber-400', bg: '' },
-                  { label: 'Expectancy/Trade', value: results.metrics.expectancy_usd != null ? `$${results.metrics.expectancy_usd}` : '—', color: 'text-accentGreen', bg: '' },
+                  { label: 'Expectancy/Trade', value: results.metrics.expectancy_usd != null ? formatCurrency(results.metrics.expectancy_usd, currency) : '—', color: 'text-accentGreen', bg: '' },
                 ] : []),
               ].map((m) => (
                 <div key={m.label} className={`bg-cardBg border ${m.bg || 'border-borderColor'} p-4 rounded-xl shadow`}>
@@ -336,7 +340,7 @@ export const Backtesting = () => {
                     <YAxis stroke="#8b949e" fontSize={9} tick={{ fill: '#8b949e' }} domain={['dataMin - 100', 'dataMax + 100']} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#161b22', borderColor: '#30363d', color: '#fff', fontSize: 11 }}
-                      formatter={(v) => [`$${v}`, 'Equity']}
+                      formatter={(v) => [`${currSym}${v}`, 'Equity']}
                     />
                     <ReferenceLine y={initialBalance} stroke="#8b949e" strokeDasharray="4 4" />
                     <Area type="monotone" dataKey="equity" stroke="#00d395" fill="url(#eqGradient)" strokeWidth={2.5} dot={false} />
@@ -369,8 +373,8 @@ export const Backtesting = () => {
                       <th className="p-3">Entry</th>
                       <th className="p-3">Exit</th>
                       <th className="p-3">Type</th>
-                      <th className="p-3">Entry $</th>
-                      <th className="p-3">Exit $</th>
+                      <th className="p-3">Entry Price</th>
+                      <th className="p-3">Exit Price</th>
                       <th className="p-3">Lots</th>
                       <th className="p-3">P&L</th>
                     </tr>
@@ -394,7 +398,7 @@ export const Backtesting = () => {
                         <td className="p-3 text-gray-300">{t.exit_price}</td>
                         <td className="p-3 text-gray-400">{t.lots}</td>
                         <td className={`p-3 font-bold ${t.profit >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
-                          {t.profit >= 0 ? `+$${t.profit}` : `-$${Math.abs(t.profit)}`}
+                          {t.profit >= 0 ? '+' : ''}{formatCurrency(t.profit, currency)}
                         </td>
                       </tr>
                     ))}

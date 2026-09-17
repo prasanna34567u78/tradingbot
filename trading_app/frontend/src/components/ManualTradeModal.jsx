@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { usePositionsStore } from '../store/positionsStore';
+import { useAccountStore } from '../store/accountStore';
+import { getCurrencySymbol } from '../utils/formatters';
 import { X, ShieldAlert, CheckCircle, AlertTriangle, Play } from 'lucide-react';
 
 export const ManualTradeModal = ({ isOpen, onClose }) => {
   const openNewPosition = usePositionsStore((state) => state.openNewPosition);
+  const currency = useAccountStore((state) => state.account?.currency || 'INR');
+  const currSym = getCurrencySymbol(currency);
 
   const [symbol, setSymbol] = useState('BTCUSDm');
   const [direction, setDirection] = useState('BUY');
@@ -187,8 +191,8 @@ export const ManualTradeModal = ({ isOpen, onClose }) => {
           {/* Calculated Risk Calculator Banner */}
           <div className="p-3 bg-darkBg border border-borderColor rounded-xl flex items-center justify-between text-xs font-mono">
             <div>
-              <span className="text-gray-400 block">Est. Risk: <span className="text-accentRed font-bold">-${riskAmount}</span></span>
-              <span className="text-gray-400 block">Est. Reward: <span className="text-accentGreen font-bold">+${rewardAmount}</span></span>
+              <span className="text-gray-400 block">Est. Risk: <span className="text-accentRed font-bold">-{currSym}{riskAmount}</span></span>
+              <span className="text-gray-400 block">Est. Reward: <span className="text-accentGreen font-bold">+{currSym}{rewardAmount}</span></span>
             </div>
             <div className="text-right">
               <span className="text-gray-400 block">Risk:Reward Ratio</span>

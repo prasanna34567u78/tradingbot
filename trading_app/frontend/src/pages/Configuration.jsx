@@ -19,7 +19,7 @@ export const Configuration = () => {
   const saveConfiguration = useConfigStore((state) => state.saveConfiguration);
   const resetChanges = useConfigStore((state) => state.resetChanges);
 
-  const currency = useAccountStore((state) => state.account?.currency || 'USD');
+  const currency = useAccountStore((state) => state.account?.currency || 'INR');
   const currSym = getCurrencySymbol(currency);
 
   const [mt5Symbols, setMt5Symbols] = useState([]);

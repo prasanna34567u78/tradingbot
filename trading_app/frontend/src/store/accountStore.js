@@ -9,6 +9,7 @@ export const useAccountStore = create((set, get) => ({
     free_margin: 2000.00,
     profit: 0.00,
     daily_pnl: 0.00,
+    currency: 'INR',
     override_enabled: 0
   },
   botRunning: false,

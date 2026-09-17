@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAccountStore } from '../store/accountStore';
+import { getCurrencySymbol } from '../utils/formatters';
 import { X, Save, Database, RefreshCw } from 'lucide-react';
 
 export const EditAccountModal = ({ isOpen, onClose }) => {
   const account = useAccountStore((state) => state.account);
   const saveAccountEdit = useAccountStore((state) => state.saveAccountEdit);
+  const currSym = getCurrencySymbol(account?.currency || 'INR');
 
   const [balance, setBalance] = useState(2000.00);
   const [equity, setEquity] = useState(4998.03);
@@ -78,7 +80,7 @@ export const EditAccountModal = ({ isOpen, onClose }) => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-gray-300 font-semibold mb-1">Balance ($)</label>
+              <label className="block text-gray-300 font-semibold mb-1">Balance ({currSym})</label>
               <input
                 type="number"
                 step="0.01"
@@ -88,7 +90,7 @@ export const EditAccountModal = ({ isOpen, onClose }) => {
               />
             </div>
             <div>
-              <label className="block text-gray-300 font-semibold mb-1">Equity ($)</label>
+              <label className="block text-gray-300 font-semibold mb-1">Equity ({currSym})</label>
               <input
                 type="number"
                 step="0.01"
@@ -101,7 +103,7 @@ export const EditAccountModal = ({ isOpen, onClose }) => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-gray-300 font-semibold mb-1">Used Margin ($)</label>
+              <label className="block text-gray-300 font-semibold mb-1">Used Margin ({currSym})</label>
               <input
                 type="number"
                 step="0.01"
@@ -111,7 +113,7 @@ export const EditAccountModal = ({ isOpen, onClose }) => {
               />
             </div>
             <div>
-              <label className="block text-gray-300 font-semibold mb-1">Free Margin ($)</label>
+              <label className="block text-gray-300 font-semibold mb-1">Free Margin ({currSym})</label>
               <input
                 type="number"
                 step="0.01"

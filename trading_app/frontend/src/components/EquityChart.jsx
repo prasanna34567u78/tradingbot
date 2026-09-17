@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAnalyticsStore } from '../store/analyticsStore';
+import { useAccountStore } from '../store/accountStore';
+import { formatCurrency, getCurrencySymbol } from '../utils/formatters';
 import { 
   BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, 
   AreaChart, Area 
@@ -10,6 +12,8 @@ export const EquityChart = () => {
   const [range, setRange] = useState('1W'); // '1D', '1W', '1M', 'All'
   const [chartType, setChartType] = useState('bar'); // 'bar' or 'area'
   const equityCurve = useAnalyticsStore((state) => state.equityCurve);
+  const currency = useAccountStore((state) => state.account?.currency || 'INR');
+  const currSym = getCurrencySymbol(currency);
 
   const hasData = Array.isArray(equityCurve) && equityCurve.length > 0;
 
@@ -71,11 +75,11 @@ export const EquityChart = () => {
             {data.date ? `${data.date} ${data.time}` : data.time}
           </div>
           <div className="text-white font-bold text-sm">
-            Equity: <span className="text-accentGreen">${Number(data.equity || 0).toFixed(2)}</span>
+            Equity: <span className="text-accentGreen">{formatCurrency(data.equity || 0, currency)}</span>
           </div>
           {data.pnl !== undefined && data.trade !== 'live' && (
             <div className={`text-[11px] font-bold ${data.pnl >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
-              P&L: {data.pnl >= 0 ? '+' : ''}${Number(data.pnl).toFixed(2)}
+              P&L: {data.pnl >= 0 ? '+' : ''}{formatCurrency(data.pnl, currency)}
             </div>
           )}
           <div className="text-[10px] text-gray-500 uppercase">
@@ -163,7 +167,7 @@ export const EquityChart = () => {
                   domain={[minVal, maxVal]} 
                   fontSize={10} 
                   fontStyle="mono" 
-                  tickFormatter={(val) => `$${val}`} 
+                  tickFormatter={(val) => `${currSym}${val}`} 
                 />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} />
                 <Bar dataKey="equity" radius={[4, 4, 0, 0]} maxBarSize={36}>
@@ -188,7 +192,7 @@ export const EquityChart = () => {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#30363d" vertical={false} />
                 <XAxis dataKey="time" stroke="#8b949e" tickLine={false} fontSize={10} fontStyle="mono" />
-                <YAxis stroke="#8b949e" tickLine={false} domain={[minVal, maxVal]} fontSize={10} fontStyle="mono" tickFormatter={(val) => `$${val}`} />
+                <YAxis stroke="#8b949e" tickLine={false} domain={[minVal, maxVal]} fontSize={10} fontStyle="mono" tickFormatter={(val) => `${currSym}${val}`} />
                 <Tooltip content={<CustomTooltip />} />
                 <Area type="monotone" dataKey="equity" stroke="#00d395" strokeWidth={2.5} fillOpacity={1} fill="url(#equityGrad)" />
               </AreaChart>

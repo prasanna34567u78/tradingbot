@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { usePositionsStore } from '../store/positionsStore';
+import { useAccountStore } from '../store/accountStore';
+import { formatCurrency } from '../utils/formatters';
 import { X, Check, Save, Scissors, DollarSign } from 'lucide-react';
 
 export const TradeDrawer = () => {
+  const currency = useAccountStore((state) => state.account?.currency || 'INR');
   const selectedPosition = usePositionsStore((state) => state.selectedPosition);
   const setSelectedPosition = usePositionsStore((state) => state.setSelectedPosition);
   const modifyTrade = usePositionsStore((state) => state.modifyTrade);
@@ -85,7 +88,7 @@ export const TradeDrawer = () => {
             <div>
               <span className="text-gray-400 block">Floating Profit</span>
               <span className={`font-bold text-sm ${selectedPosition.profit >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
-                ${selectedPosition.profit?.toFixed(2)}
+                {formatCurrency(selectedPosition.profit, currency)}
               </span>
             </div>
           </div>

@@ -18,7 +18,7 @@ export const TopHeader = ({ onOpenGemini, onToggleMobileMenu }) => {
   const [toast, setToast] = useState(null);
 
   const strategyMode = config?.STRATEGY_MODE || 'mcp_enhanced';
-  const currency = account?.currency || 'USD';
+  const currency = account?.currency || 'INR';
 
   // Sync bot status from backend on mount (before WebSocket kicks in)
   useEffect(() => {

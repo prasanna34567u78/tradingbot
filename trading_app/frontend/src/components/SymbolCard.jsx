@@ -15,7 +15,7 @@ export const SymbolCard = ({ symbol, data, onChange, onRemove }) => {
   const color = symbolColors[symbol] || { text: 'text-purple-400', border: 'border-purple-500/40', badge: 'bg-purple-500/10 text-purple-400' };
 
   const isEnabled = data?.enabled ?? false;
-  const currency = useAccountStore((state) => state.account?.currency || 'USD');
+  const currency = useAccountStore((state) => state.account?.currency || 'INR');
   const currSym = getCurrencySymbol(currency);
 
   const handleToggleEnable = (e) => {

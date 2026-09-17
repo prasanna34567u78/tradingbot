@@ -386,9 +386,11 @@ class MT5Executor:
                 drawdown = ((self.peak_balance - current_equity) / self.peak_balance) * 100
                 max_dd = config.RISK_MANAGEMENT['max_drawdown_stop']
                 
+                acc_c = self.get_account_currency()
+                c_sym = "₹" if acc_c in ["INR", "RS", "RUPEES"] else ("$" if acc_c == "USD" else f"{acc_c} ")
                 if drawdown > max_dd:
                     logger.error(f"TRADING HALTED - Maximum drawdown exceeded: {drawdown:.2f}% > {max_dd}%")
-                    logger.error(f"Peak Balance: ${self.peak_balance:.2f}, Current Equity: ${current_equity:.2f}")
+                    logger.error(f"Peak Balance: {c_sym}{self.peak_balance:.2f}, Current Equity: {c_sym}{current_equity:.2f}")
                     return False
                 elif drawdown > max_dd * 0.8:  # Warning at 80% of max drawdown
                     logger.warning(f"DRAWDOWN WARNING: {drawdown:.2f}% approaching limit of {max_dd}%")

@@ -1,7 +1,7 @@
 import React from 'react';
 import { usePositionsStore } from '../store/positionsStore';
 import { useAccountStore } from '../store/accountStore';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, getCurrencySymbol } from '../utils/formatters';
 import { Edit2, XCircle, TrendingUp, Shield, Zap } from 'lucide-react';
 
 export const TradeTable = ({ onOpenManualTrade }) => {
@@ -9,7 +9,8 @@ export const TradeTable = ({ onOpenManualTrade }) => {
   const closeTrade = usePositionsStore((state) => state.closeTrade);
   const partialCloseTrade = usePositionsStore((state) => state.partialCloseTrade);
   const setSelectedPosition = usePositionsStore((state) => state.setSelectedPosition);
-  const currency = useAccountStore((state) => state.account?.currency || 'USD');
+  const currency = useAccountStore((state) => state.account?.currency || 'INR');
+  const currSym = getCurrencySymbol(currency);
 
   return (
     <div className="bg-cardBg border border-borderColor rounded-xl overflow-hidden flex flex-col h-full">
@@ -124,7 +125,7 @@ export const TradeTable = ({ onOpenManualTrade }) => {
               <th className="p-3">Current</th>
               <th className="p-3">SL</th>
               <th className="p-3">TP</th>
-              <th className="p-3">Profit ($)</th>
+              <th className="p-3">Profit ({currSym})</th>
               <th className="p-3">Actions</th>
             </tr>
           </thead>
