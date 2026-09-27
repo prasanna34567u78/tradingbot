@@ -108,13 +108,9 @@ class SweepStructureStrategy:
             macro_bull = e50[i] > e200[i]
             macro_bear = e50[i] < e200[i]
 
-            # 1-Hour HTF EMA 200 Alignment (Setup 2):
-            # Block BUYs if price is below 1H EMA 200; Block SELLs if price is above 1H EMA 200
-            if not np.isnan(htf_ema_val):
-                if c[i] < htf_ema_val:
-                    macro_bull = False
-                if c[i] > htf_ema_val:
-                    macro_bear = False
+            # NOTE: HTF 1H EMA 200 alignment filter REMOVED — it was blocking the sweep
+            # pattern itself (SSL dip momentarily puts price near/below 1H EMA200).
+            # The 5M EMA50/200 filter (macro_bull / macro_bear) already handles trend alignment.
 
             buy_setup = False
             sell_setup = False

@@ -17,7 +17,7 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger('gold_trading_bot')
 
 class EconomicNewsFilter:
-    def __init__(self, buffer_before_minutes: int = 30, buffer_after_minutes: int = 30):
+    def __init__(self, buffer_before_minutes: int = 5, buffer_after_minutes: int = 5):
         self.buffer_before = timedelta(minutes=buffer_before_minutes)
         self.buffer_after = timedelta(minutes=buffer_after_minutes)
         self.last_fetch_time = 0.0

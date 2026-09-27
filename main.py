@@ -410,7 +410,7 @@ class GoldTradingBot:
         self.symbol_cooldowns = {}       # symbol -> timestamp when cooldown ends
         self.last_traded_candle = {}     # symbol -> last candle timestamp traded on
         self.last_known_trades = {}      # symbol -> previous open trades dict to detect broker SL hits
-        self.news_filter = EconomicNewsFilter(buffer_before_minutes=30, buffer_after_minutes=30)
+        self.news_filter = EconomicNewsFilter(buffer_before_minutes=5, buffer_after_minutes=5)
         
         # Initialize scheduler
         self.scheduler = BackgroundScheduler()
@@ -601,13 +601,14 @@ class GoldTradingBot:
                           f"Current SL: {trade_info['stop_loss']}, "
                           f"Profit: {profit_display}")
                 
-                # Check for Pre-London Auto-Close Safeguard (06:45 - 07:00 UTC)
-                # Closes any active Asian session positions before volatile London session open
+                # Check for Pre-London Auto-Close Safeguard (07:30 UTC)
+                # Closes any active Asian session positions only at true London open to protect capital.
+                # NOTE: Was 06:45 UTC — pushed to 07:30 to allow Asian trades to reach TP.
                 from datetime import datetime, timezone
                 now_utc = datetime.now(timezone.utc)
-                is_pre_london = (now_utc.hour == 6 and now_utc.minute >= 45) or (now_utc.hour == 7 and now_utc.minute == 0)
+                is_pre_london = (now_utc.hour == 7 and now_utc.minute >= 30)
                 if is_pre_london:
-                    logger.info(f"{symbol} - 🛡️ PRE-LONDON CLOSE TRIGGERED (06:45 UTC). Closing trade before London open to protect profit/capital.")
+                    logger.info(f"{symbol} - 🛡️ PRE-LONDON CLOSE TRIGGERED (07:30 UTC). Closing trade before London open to protect profit/capital.")
                     position_size = trade_info.get('volume', None)
                     if position_size and executor.close_trade(trade_id, position_size, "Pre-London Safeguard Close"):
                         exit_price = current_price['bid'] if trade_info['side'] == 'buy' else current_price['ask']
@@ -722,14 +723,15 @@ class GoldTradingBot:
                     
                     now_t = time.time()
                     if realized_pnl < 0:
-                        # Enforce mandatory 5-minute (300s) cooldown to prevent revenge churn on whipsaws
-                        self.symbol_cooldowns[symbol] = now_t + 300
-                        logger.warning(f"[{symbol}] 🛡️ Broker SL Hit: Loss ${realized_pnl:.2f}. Mandatory 5-Minute (300s) Cooldown ENFORCED.")
+                        # 90s cooldown after SL — prevents same-candle revenge entry but allows next 5M bar signal
+                        # NOTE: Was 300s (5 min) — reduced to 90s to avoid missing valid recovery setups
+                        self.symbol_cooldowns[symbol] = now_t + 90
+                        logger.warning(f"[{symbol}] 🛡️ Broker SL Hit: Loss ${realized_pnl:.2f}. 90s Cooldown ENFORCED.")
                         if self.telegram.enabled:
                             self.telegram.send_message(
                                 f"🛡️ SL Hit - {symbol}\n"
                                 f"Loss: ${abs(realized_pnl):.2f}\n"
-                                f"Cooldown: 5 minutes active (preventing churn)."
+                                f"Cooldown: 90s active (prevents same-candle re-entry)."
                             )
                     else:
                         self.symbol_cooldowns[symbol] = now_t + 90
