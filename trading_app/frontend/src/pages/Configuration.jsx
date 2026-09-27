@@ -4,7 +4,7 @@ import { useAccountStore } from '../store/accountStore';
 import { getCurrencySymbol } from '../utils/formatters';
 import { getMT5Symbols } from '../api/tradingApi';
 import { SymbolCard } from '../components/SymbolCard';
-import { Save, RotateCcw, AlertTriangle, Shield, Sliders, Clock, Radio, CheckCircle, Database, Plus, Search, Globe, Zap, ArrowDownCircle } from 'lucide-react';
+import { Save, RotateCcw, AlertTriangle, Shield, Sliders, Clock, Radio, CheckCircle, Database, Plus, Search, Globe, Zap, ArrowDownCircle, Award, Sparkles } from 'lucide-react';
 
 export const Configuration = () => {
   const config = useConfigStore((state) => state.config);
@@ -25,6 +25,10 @@ export const Configuration = () => {
   const [mt5Symbols, setMt5Symbols] = useState([]);
   const [selectedAddSymbol, setSelectedAddSymbol] = useState('');
   const [appliedGlobalToast, setAppliedGlobalToast] = useState(false);
+  const [propFirmSize, setPropFirmSize] = useState(10000);
+  const [propFirmCurrency, setPropFirmCurrency] = useState('USD');
+  const [propFirmProfile, setPropFirmProfile] = useState('conservative');
+  const [appliedPropFirmToast, setAppliedPropFirmToast] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -85,6 +89,71 @@ export const Configuration = () => {
     updateField('SYMBOLS', updatedSymbols);
     setAppliedGlobalToast(true);
     setTimeout(() => setAppliedGlobalToast(false), 3500);
+  };
+
+  const handleApplyPropFirmPreset = () => {
+    const size = parseFloat(propFirmSize) || 10000;
+    const isINR = propFirmCurrency === 'INR';
+    
+    // Risk percent per trade: 0.5% (Conservative) or 1.0% (Standard)
+    const riskPct = propFirmProfile === 'conservative' ? 0.5 : 1.0;
+    
+    // Max Dollar / Rupee Risk Cap per Trade
+    const riskCap = Math.round(size * (riskPct / 100));
+    
+    // Lot Size calculation:
+    // Base standard: 0.02 lots per $10k USD (or equivalent in INR at 1 USD ~ 85 INR)
+    let baseLot;
+    if (isINR) {
+      baseLot = Math.max(0.01, Math.round((size / 850000) * 0.02 * 100) / 100);
+    } else {
+      baseLot = Math.max(0.01, Math.round((size / 10000) * 0.02 * 100) / 100);
+    }
+    const maxLot = Math.max(0.02, Math.round(baseLot * 2.5 * 100) / 100);
+    
+    // 1. Set Execution Strategy to Liquidity Sweep Structure (5M)
+    updateField('STRATEGY_MODE', 'sweep_structure');
+    updateField('TIMEFRAMES.primary', '5m');
+    
+    // 2. Set Sweep Structure Session & Fine-Tuning
+    updateField('SWEEP_STRUCTURE_SETTINGS.enabled', true);
+    updateField('SWEEP_STRUCTURE_SETTINGS.timeframe', '5m');
+    updateField('SWEEP_STRUCTURE_SETTINGS.disable_overnight', true);
+    updateField('SWEEP_STRUCTURE_SETTINGS.cooldown_bars', 8);
+    updateField('SWEEP_STRUCTURE_SETTINGS.sl_buffer_pts', 0.35);
+    updateField('SWEEP_STRUCTURE_SETTINGS.max_sl_pts', 20.0);
+    updateField('SWEEP_STRUCTURE_SETTINGS.buy_rr', 3.0);
+    updateField('SWEEP_STRUCTURE_SETTINGS.sell_rr', 2.0);
+    updateField('SWEEP_STRUCTURE_SETTINGS.session_filter', true);
+    
+    // 3. Set Master Global Risk Management (Prop Firm Rules)
+    updateField('RISK_MANAGEMENT.global_risk_percent', riskPct);
+    updateField('RISK_MANAGEMENT.global_max_risk_amount', riskCap);
+    updateField('RISK_MANAGEMENT.global_fixed_lot_size', baseLot);
+    updateField('RISK_MANAGEMENT.global_max_lot_size', maxLot);
+    updateField('RISK_MANAGEMENT.max_daily_losses', 2);
+    updateField('RISK_MANAGEMENT.daily_loss_limit', 4.0);
+    updateField('RISK_MANAGEMENT.max_drawdown_stop', 8.0);
+    updateField('RISK_MANAGEMENT.max_total_risk', 2.0);
+    updateField('RISK_MANAGEMENT.max_correlated_risk', 1.5);
+    updateField('RISK_MANAGEMENT.consecutive_loss_limit', 2);
+    
+    // 4. Update all active symbols with matching risk parameters
+    const updatedSymbols = { ...symbols };
+    Object.keys(updatedSymbols).forEach((sym) => {
+      updatedSymbols[sym] = {
+        ...updatedSymbols[sym],
+        risk_percent: riskPct,
+        fixed_lot_size: baseLot,
+        max_risk_amount: riskCap,
+        max_lot_size: maxLot,
+        max_trades: 1,
+      };
+    });
+    updateField('SYMBOLS', updatedSymbols);
+    
+    setAppliedPropFirmToast(true);
+    setTimeout(() => setAppliedPropFirmToast(false), 6000);
   };
 
   const handleAddSymbol = (symName) => {
@@ -811,6 +880,211 @@ export const Configuration = () => {
               />
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* 🏛️ Section 3.9 — Prop Firm Account Auto-Configurator (Downside Preset Wizard) */}
+      <div className="bg-gradient-to-r from-cardBg via-darkBg to-indigo-950/40 border border-indigo-500/40 p-6 rounded-2xl space-y-5 shadow-2xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-borderColor/60 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/30">
+              <Award size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-white text-base">
+                  3.9 Prop Firm Auto-Configuration Wizard
+                </h3>
+                <span className="text-[10px] font-bold bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Sparkles size={10} /> One-Click Default Setup
+                </span>
+              </div>
+              <span className="text-xs text-gray-400">
+                Input your evaluation account size to automatically calibrate compliant risk, lot sizing, and circuit breakers (FTMO, FundedNext, Funding Pips, TopStep).
+              </span>
+            </div>
+          </div>
+
+          {appliedPropFirmToast && (
+            <span className="text-xs font-bold text-accentGreen flex items-center gap-1.5 bg-accentGreen/20 px-3.5 py-2 rounded-xl border border-accentGreen/40 animate-pulse">
+              <CheckCircle size={15} /> Prop Firm Defaults Applied! Click "Save Configuration" Below.
+            </span>
+          )}
+        </div>
+
+        {/* Configuration Inputs Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          {/* 1. Account Size & Currency */}
+          <div className="bg-darkBg/90 border border-borderColor p-4 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-gray-300 font-bold">1. Account Size</label>
+              <div className="flex items-center gap-1 bg-cardBg border border-borderColor rounded-lg p-0.5">
+                {['USD', 'EUR', 'INR'].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      setPropFirmCurrency(c);
+                      if (c === 'INR' && propFirmSize < 50000) setPropFirmSize(500000);
+                      if (c !== 'INR' && propFirmSize >= 50000) setPropFirmSize(10000);
+                    }}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                      propFirmCurrency === c ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {c === 'USD' ? '$ USD' : (c === 'INR' ? '₹ INR' : '€ EUR')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="relative">
+              <span className="absolute left-3 top-2.5 text-gray-400 font-bold font-mono">
+                {propFirmCurrency === 'INR' ? '₹' : (propFirmCurrency === 'EUR' ? '€' : '$')}
+              </span>
+              <input
+                type="number"
+                step={propFirmCurrency === 'INR' ? 50000 : 5000}
+                value={propFirmSize}
+                onChange={(e) => setPropFirmSize(Math.max(100, parseFloat(e.target.value) || 0))}
+                className="w-full bg-cardBg border border-borderColor rounded-xl pl-8 pr-3 py-2 text-white font-mono font-bold text-sm"
+                placeholder="e.g. 10000"
+              />
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {(propFirmCurrency === 'INR' ? [100000, 250000, 500000, 1000000, 2500000] : [5000, 10000, 25000, 50000, 100000, 200000]).map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  onClick={() => setPropFirmSize(amt)}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-semibold transition ${
+                    propFirmSize === amt
+                      ? 'bg-indigo-600 text-white border border-indigo-400'
+                      : 'bg-cardBg hover:bg-borderColor text-gray-300 border border-borderColor/60'
+                  }`}
+                >
+                  {propFirmCurrency === 'INR' ? `₹${amt / 1000}k` : `$${amt / 1000}k`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. Risk Profile & Strategy Mode */}
+          <div className="bg-darkBg/90 border border-borderColor p-4 rounded-xl space-y-3">
+            <label className="text-gray-300 font-bold block">2. Risk Profile</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPropFirmProfile('conservative')}
+                className={`p-2.5 rounded-xl border text-left transition ${
+                  propFirmProfile === 'conservative'
+                    ? 'border-indigo-500 bg-indigo-500/20 text-white shadow-md'
+                    : 'border-borderColor bg-cardBg text-gray-400 hover:text-white'
+                }`}
+              >
+                <div className="font-bold text-xs text-indigo-300 flex items-center justify-between">
+                  <span>Conservative</span>
+                  <span className="text-[10px] font-mono">0.5%</span>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">Recommended for Phase 1 & 2 Evaluations.</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPropFirmProfile('moderate')}
+                className={`p-2.5 rounded-xl border text-left transition ${
+                  propFirmProfile === 'moderate'
+                    ? 'border-amber-500 bg-amber-500/20 text-white shadow-md'
+                    : 'border-borderColor bg-cardBg text-gray-400 hover:text-white'
+                }`}
+              >
+                <div className="font-bold text-xs text-amber-300 flex items-center justify-between">
+                  <span>Standard</span>
+                  <span className="text-[10px] font-mono">1.0%</span>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">For funded accounts & faster scaling.</p>
+              </button>
+            </div>
+
+            <div className="p-2 rounded-lg bg-cardBg border border-borderColor/60 text-[11px] text-gray-400 flex items-center justify-between">
+              <span>Strategy Engine:</span>
+              <span className="text-emerald-400 font-bold">Sweep Structure (5M)</span>
+            </div>
+          </div>
+
+          {/* 3. Action Button */}
+          <div className="bg-darkBg/90 border border-borderColor p-4 rounded-xl flex flex-col justify-between space-y-3">
+            <div>
+              <span className="text-gray-300 font-bold block mb-1">3. Apply & Calibrate</span>
+              <p className="text-[11px] text-gray-400">
+                Calibrates lot sizes, dollar SL caps, circuit breakers, and disables overnight session across all pairs.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleApplyPropFirmPreset}
+              className="w-full py-3 bg-gradient-to-r from-indigo-600 via-indigo-500 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-95 transition"
+            >
+              <Zap size={16} /> Apply Prop Firm Defaults
+            </button>
+          </div>
+        </div>
+
+        {/* Live Calculation Preview Banner */}
+        <div className="bg-darkBg/60 border border-indigo-500/20 p-4 rounded-xl">
+          <div className="flex items-center justify-between text-[11px] font-bold text-indigo-300 mb-2">
+            <span>CALCULATED PARAMETERS PREVIEW FOR {propFirmCurrency === 'INR' ? '₹' : (propFirmCurrency === 'EUR' ? '€' : '$')}{propFirmSize.toLocaleString()} ACCOUNT:</span>
+            <span className="text-gray-400">{propFirmProfile === 'conservative' ? 'Conservative Mode (0.5%)' : 'Standard Mode (1.0%)'}</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+            <div className="bg-cardBg p-2.5 rounded-lg border border-borderColor">
+              <span className="text-[10px] text-gray-400 block">Max Risk / Trade</span>
+              <span className="font-mono font-bold text-emerald-400">
+                {propFirmCurrency === 'INR' ? '₹' : (propFirmCurrency === 'EUR' ? '€' : '$')}
+                {Math.round(propFirmSize * ((propFirmProfile === 'conservative' ? 0.5 : 1.0) / 100)).toLocaleString()}
+              </span>
+              <span className="text-[9px] text-gray-500 block">({propFirmProfile === 'conservative' ? '0.5%' : '1.0%'} capital)</span>
+            </div>
+
+            <div className="bg-cardBg p-2.5 rounded-lg border border-borderColor">
+              <span className="text-[10px] text-gray-400 block">Micro Lot Size</span>
+              <span className="font-mono font-bold text-white">
+                {propFirmCurrency === 'INR'
+                  ? Math.max(0.01, Math.round((propFirmSize / 850000) * 0.02 * 100) / 100)
+                  : Math.max(0.01, Math.round((propFirmSize / 10000) * 0.02 * 100) / 100)} Lots
+              </span>
+              <span className="text-[9px] text-gray-500 block">Safe position size</span>
+            </div>
+
+            <div className="bg-cardBg p-2.5 rounded-lg border border-borderColor">
+              <span className="text-[10px] text-gray-400 block">Daily Circuit Breaker</span>
+              <span className="font-mono font-bold text-amber-400">2 Losses Max</span>
+              <span className="text-[9px] text-gray-500 block">Auto-halts until 00:00 UTC</span>
+            </div>
+
+            <div className="bg-cardBg p-2.5 rounded-lg border border-borderColor">
+              <span className="text-[10px] text-gray-400 block">Max Daily Loss</span>
+              <span className="font-mono font-bold text-amber-400">
+                {propFirmProfile === 'conservative' ? '1.0% (Max 4.0%)' : '2.0% (Max 4.0%)'}
+              </span>
+              <span className="text-[9px] text-gray-500 block">5.0% prop firm limit safe</span>
+            </div>
+
+            <div className="bg-cardBg p-2.5 rounded-lg border border-borderColor">
+              <span className="text-[10px] text-gray-400 block">Max Drawdown Stop</span>
+              <span className="font-mono font-bold text-accentRed">8.0% Ceiling</span>
+              <span className="text-[9px] text-gray-500 block">2% safety margin from 10%</span>
+            </div>
+
+            <div className="bg-cardBg p-2.5 rounded-lg border border-borderColor">
+              <span className="text-[10px] text-gray-400 block">Overnight Session</span>
+              <span className="font-mono font-bold text-emerald-400">BLOCKED</span>
+              <span className="text-[9px] text-gray-500 block">18:00–00:00 UTC disabled</span>
+            </div>
+          </div>
         </div>
       </div>
 
