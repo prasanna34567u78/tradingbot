@@ -755,6 +755,10 @@ class MT5Executor:
             logger.error(f"Failed to fetch account balance: {str(e)}")
             return None
 
+    def get_balance(self):
+        """Alias for get_account_balance"""
+        return self.get_account_balance()
+
     def get_current_price(self):
         """
         Get current price with connection check

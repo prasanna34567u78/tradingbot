@@ -523,9 +523,9 @@ class GoldTradingBot:
             if daily_loss_pct is not None and float(daily_loss_pct) > 0:
                 primary_executor = next(iter(self.executors.values()), None)
                 if primary_executor:
-                    acc_balance = primary_executor.get_balance()
-                    if acc_balance > 0:
-                        max_loss_money = acc_balance * (float(daily_loss_pct) / 100.0)
+                    acc_balance = primary_executor.get_account_balance() if hasattr(primary_executor, 'get_account_balance') else 0.0
+                    if acc_balance and float(acc_balance) > 0:
+                        max_loss_money = float(acc_balance) * (float(daily_loss_pct) / 100.0)
                         if today_pnl <= -max_loss_money:
                             logger.warning(
                                 f"🛡️ DAILY LOSS LIMIT HIT: Today P&L ({today_pnl:+.2f}) exceeded "
