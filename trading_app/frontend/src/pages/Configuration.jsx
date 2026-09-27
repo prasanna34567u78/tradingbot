@@ -231,6 +231,87 @@ export const Configuration = () => {
         </div>
       </div>
 
+      {/* 🛡️ Section 3.7 — Sweep Structure Session Window & Overnight Control */}
+      <div className="bg-cardBg border border-emerald-500/40 p-5 rounded-2xl space-y-4 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-borderColor/60 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+              <Shield size={20} />
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-base flex items-center gap-2">
+                Sweep Structure Session Window & Overnight Filter
+              </h3>
+              <span className="text-xs text-gray-400">
+                Configure institutional trading sessions for the Sweep Structure strategy (Asian, NY Power, Overnight)
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-300">Overnight (18:00–00:00 UTC):</span>
+            <button
+              type="button"
+              onClick={() => {
+                const currentVal = config.SWEEP_STRUCTURE_SETTINGS?.disable_overnight ?? true;
+                updateField('SWEEP_STRUCTURE_SETTINGS.disable_overnight', !currentVal);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                (config.SWEEP_STRUCTURE_SETTINGS?.disable_overnight ?? true)
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+              }`}
+            >
+              {(config.SWEEP_STRUCTURE_SETTINGS?.disable_overnight ?? true) ? '🛡️ Overnight DISABLED (Recommended)' : '⚠️ Overnight ENABLED'}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+          <div className={`p-4 rounded-xl border transition ${
+            (config.SWEEP_STRUCTURE_SETTINGS?.disable_overnight ?? true)
+              ? 'border-emerald-500/40 bg-emerald-500/10'
+              : 'border-borderColor bg-darkBg'
+          }`}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-bold text-xs text-white">Asian Session (00:00 – 07:00 UTC)</span>
+              <span className="text-[10px] font-bold bg-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded-full">ACTIVE</span>
+            </div>
+            <p className="text-[11px] text-gray-400">High win-rate Asian range sweeps with 06:30 entry cutoff & 07:30 auto-close.</p>
+          </div>
+
+          <div className={`p-4 rounded-xl border transition ${
+            (config.SWEEP_STRUCTURE_SETTINGS?.disable_overnight ?? true)
+              ? 'border-emerald-500/40 bg-emerald-500/10'
+              : 'border-borderColor bg-darkBg'
+          }`}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-bold text-xs text-white">NY Power Session (13:00 – 18:00 UTC)</span>
+              <span className="text-[10px] font-bold bg-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded-full">ACTIVE</span>
+            </div>
+            <p className="text-[11px] text-gray-400">High volume institutional trend extensions during US cash open overlap.</p>
+          </div>
+
+          <div className={`p-4 rounded-xl border transition ${
+            !(config.SWEEP_STRUCTURE_SETTINGS?.disable_overnight ?? true)
+              ? 'border-amber-500/40 bg-amber-500/10'
+              : 'border-borderColor bg-darkBg opacity-60'
+          }`}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-bold text-xs text-white">Overnight Session (18:00 – 00:00 UTC)</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                (config.SWEEP_STRUCTURE_SETTINGS?.disable_overnight ?? true)
+                  ? 'bg-red-500/20 text-red-400'
+                  : 'bg-amber-500/30 text-amber-300'
+              }`}>
+                {(config.SWEEP_STRUCTURE_SETTINGS?.disable_overnight ?? true) ? 'BLOCKED' : 'ACTIVE'}
+              </span>
+            </div>
+            <p className="text-[11px] text-gray-400">Low liquidity chop after US close. Disabling eliminates ~₹8,900 of drawdown.</p>
+          </div>
+        </div>
+      </div>
+
       {/* 🌐 Master Global Risk Management (Across All Pairs) */}
       <div className="bg-gradient-to-r from-cardBg via-cardBg to-darkBg border border-accentBlue/40 p-5 rounded-2xl space-y-4 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-borderColor/60 pb-3">

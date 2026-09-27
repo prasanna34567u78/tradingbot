@@ -216,6 +216,7 @@ def read_config_dict() -> Dict[str, Any]:
             "AI_SETTINGS": ns.get("AI_SETTINGS", {}),
             "STRATEGY_MODE": ns.get("STRATEGY_MODE", "pde"),
             "PDE_SETTINGS": ns.get("PDE_SETTINGS", {}),
+            "SWEEP_STRUCTURE_SETTINGS": ns.get("SWEEP_STRUCTURE_SETTINGS", {}),
             "SCHEDULER_INTERVALS": ns.get("SCHEDULER_INTERVALS", {}),
             "TRADE_QUALITY": ns.get("TRADE_QUALITY", {}),
             "OPENAI_MODEL": ns.get("OPENAI_MODEL", "gpt-4o-mini"),
@@ -288,6 +289,7 @@ GEMINI_MODEL = {repr(updated_config.get('GEMINI_MODEL', 'gemini-1.5-pro'))}
 
 STRATEGY_MODE = {repr(updated_config.get('STRATEGY_MODE', 'pde'))}
 PDE_SETTINGS = {pprint.pformat(updated_config.get('PDE_SETTINGS', {}), indent=4)}
+SWEEP_STRUCTURE_SETTINGS = {pprint.pformat(updated_config.get('SWEEP_STRUCTURE_SETTINGS', {}), indent=4)}
 MCP_SETTINGS = {pprint.pformat(updated_config.get('MCP_SETTINGS', {}), indent=4)}
 AI_SETTINGS = {pprint.pformat(updated_config.get('AI_SETTINGS', {}), indent=4)}
 

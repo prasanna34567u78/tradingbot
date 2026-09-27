@@ -35,8 +35,14 @@ class SweepStructureStrategy:
         self.sell_rr = float(self.config.get('sell_rr', 2.0))
         self.spread_pts = float(self.config.get('spread_pts', 0.35))
         self.session_filter = bool(self.config.get('session_filter', True))
-        # 3 Winning Sessions: Asian (00-07 UTC), NY Power (13-18 UTC), Overnight (18-00 UTC)
-        self.allowed_hours = set(range(0, 7)) | set(range(13, 24))
+        self.disable_overnight = bool(self.config.get('disable_overnight', True))
+        # Session Hours:
+        # Asian (00-07 UTC) + NY Power (13-18 UTC)
+        # If disable_overnight is False, also includes Overnight (18-24 UTC)
+        if self.disable_overnight:
+            self.allowed_hours = set(range(0, 7)) | set(range(13, 18))
+        else:
+            self.allowed_hours = set(range(0, 7)) | set(range(13, 24))
 
     def generate_signals(self, df: pd.DataFrame, df_1h: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """
