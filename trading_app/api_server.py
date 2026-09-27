@@ -309,6 +309,13 @@ TRADE_QUALITY = {pprint.pformat(updated_config.get('TRADE_QUALITY', {}), indent=
 """
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         f.write(formatted_content)
+    root_cfg_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config.py"))
+    if os.path.exists(root_cfg_path):
+        try:
+            with open(root_cfg_path, "w", encoding="utf-8") as rf:
+                rf.write(formatted_content)
+        except Exception as e:
+            print(f"Could not sync root config.py: {e}")
     save_config_to_db(updated_config)
     append_log("INFO", f"Updated config.py and SQLite bot_config database successfully.")
 

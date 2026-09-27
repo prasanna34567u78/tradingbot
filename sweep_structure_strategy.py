@@ -31,6 +31,7 @@ class SweepStructureStrategy:
         self.min_base_bars = int(self.config.get('min_base_bars', 2))
         self.max_base_bars = int(self.config.get('max_base_bars', 10))
         self.sl_buffer_pts = float(self.config.get('sl_buffer_pts', 0.35))
+        self.max_sl_pts = float(self.config.get('max_sl_pts', 20.0))
         self.buy_rr = float(self.config.get('buy_rr', 3.0))
         self.sell_rr = float(self.config.get('sell_rr', 2.0))
         self.spread_pts = float(self.config.get('spread_pts', 0.35))
@@ -161,7 +162,7 @@ class SweepStructureStrategy:
                 entry = b_low + 0.50 * (b_high - b_low) + self.spread_pts # 50% discount retest entry
                 sl = sweep_low - self.sl_buffer_pts
                 risk = entry - sl
-                if 0.8 <= risk <= 20.0:
+                if 0.8 <= risk <= self.max_sl_pts:
                     tp = entry + self.buy_rr * risk
                     signals[i] = 1
                     entry_prices[i] = entry
@@ -174,7 +175,7 @@ class SweepStructureStrategy:
                 entry = c[i] - self.spread_pts
                 sl = sweep_high + self.sl_buffer_pts
                 risk = sl - entry
-                if 0.8 <= risk <= 20.0:
+                if 0.8 <= risk <= self.max_sl_pts:
                     tp = entry - self.sell_rr * risk
                     signals[i] = -1
                     entry_prices[i] = entry

@@ -310,6 +310,87 @@ export const Configuration = () => {
             <p className="text-[11px] text-gray-400">Low liquidity chop after US close. Disabling eliminates ~₹8,900 of drawdown.</p>
           </div>
         </div>
+
+        {/* 🎛️ Fine-Tuning Controls for Sweep Structure Strategy */}
+        <div className="bg-darkBg/90 border border-emerald-500/20 p-4 rounded-xl space-y-3">
+          <div className="flex items-center justify-between border-b border-borderColor/40 pb-2">
+            <span className="font-bold text-xs text-white flex items-center gap-1.5">
+              <Shield size={14} className="text-emerald-400" /> Sweep Structure Risk & SL Fine-Tuning
+            </span>
+            <span className="text-[11px] text-gray-400">Institutional entry & exit boundaries</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
+            <div>
+              <label className="block text-gray-300 font-semibold mb-1">SL Buffer (pts)</label>
+              <input
+                type="number"
+                step="0.05"
+                min="0.10"
+                max="5.0"
+                value={config.SWEEP_STRUCTURE_SETTINGS?.sl_buffer_pts ?? 0.35}
+                onChange={(e) => updateField('SWEEP_STRUCTURE_SETTINGS.sl_buffer_pts', parseFloat(e.target.value) || 0.35)}
+                className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono"
+              />
+              <span className="text-[10px] text-gray-400">Pts past swing wick</span>
+            </div>
+
+            <div>
+              <label className="block text-gray-300 font-semibold mb-1">Max SL Cap (pts)</label>
+              <input
+                type="number"
+                step="1.0"
+                min="2.0"
+                max="50.0"
+                value={config.SWEEP_STRUCTURE_SETTINGS?.max_sl_pts ?? 20.0}
+                onChange={(e) => updateField('SWEEP_STRUCTURE_SETTINGS.max_sl_pts', parseFloat(e.target.value) || 20.0)}
+                className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono"
+              />
+              <span className="text-[10px] text-gray-400">Max SL distance filter</span>
+            </div>
+
+            <div>
+              <label className="block text-gray-300 font-semibold mb-1">Buy R:R Ratio</label>
+              <input
+                type="number"
+                step="0.1"
+                min="1.0"
+                max="10.0"
+                value={config.SWEEP_STRUCTURE_SETTINGS?.buy_rr ?? 3.0}
+                onChange={(e) => updateField('SWEEP_STRUCTURE_SETTINGS.buy_rr', parseFloat(e.target.value) || 3.0)}
+                className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono"
+              />
+              <span className="text-[10px] text-emerald-400 font-semibold">1:3 Bullish Target</span>
+            </div>
+
+            <div>
+              <label className="block text-gray-300 font-semibold mb-1">Sell R:R Ratio</label>
+              <input
+                type="number"
+                step="0.1"
+                min="1.0"
+                max="10.0"
+                value={config.SWEEP_STRUCTURE_SETTINGS?.sell_rr ?? 2.0}
+                onChange={(e) => updateField('SWEEP_STRUCTURE_SETTINGS.sell_rr', parseFloat(e.target.value) || 2.0)}
+                className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono"
+              />
+              <span className="text-[10px] text-amber-400 font-semibold">1:2 Bearish Target</span>
+            </div>
+
+            <div>
+              <label className="block text-gray-300 font-semibold mb-1">Cooldown Bars</label>
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={config.SWEEP_STRUCTURE_SETTINGS?.cooldown_bars ?? 8}
+                onChange={(e) => updateField('SWEEP_STRUCTURE_SETTINGS.cooldown_bars', parseInt(e.target.value) || 8)}
+                className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono"
+              />
+              <span className="text-[10px] text-gray-400">8 bars = 40 mins</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 🌐 Master Global Risk Management (Across All Pairs) */}
@@ -346,7 +427,7 @@ export const Configuration = () => {
         </div>
 
         {/* Global Controls Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
           {/* Global Risk % */}
           <div className="bg-darkBg/80 border border-borderColor p-3 rounded-xl space-y-2">
             <div className="flex justify-between items-center text-gray-300">
@@ -375,16 +456,16 @@ export const Configuration = () => {
             />
           </div>
 
-          {/* Global Fixed Risk Amount */}
+          {/* Global Max Risk Amount ($ / ₹ Cap) */}
           <div className="bg-darkBg/80 border border-borderColor p-3 rounded-xl space-y-2">
             <div className="flex justify-between items-center text-gray-300">
-              <span className="font-semibold">Global Risk Amount:</span>
-              <span className="text-gray-400 text-[11px]">{currSym} {currency}</span>
+              <span className="font-semibold">Max Risk Cap / Trade:</span>
+              <span className="text-emerald-400 font-bold text-[11px]">{currSym} {currency}</span>
             </div>
             <div className="flex items-center gap-2">
               <input
                 type="number"
-                step="50"
+                step="10"
                 placeholder={currency === 'INR' ? 'e.g. 2000' : 'e.g. 50'}
                 value={config.RISK_MANAGEMENT?.global_max_risk_amount ?? ''}
                 onChange={(e) => updateField('RISK_MANAGEMENT.global_max_risk_amount', e.target.value ? parseFloat(e.target.value) : null)}
@@ -395,9 +476,32 @@ export const Configuration = () => {
                 onClick={() => updateField('RISK_MANAGEMENT.global_max_risk_amount', config.RISK_MANAGEMENT?.global_max_risk_amount ? null : (currency === 'INR' ? 2000 : 50))}
                 className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition ${config.RISK_MANAGEMENT?.global_max_risk_amount ? 'bg-emerald-600 text-white' : 'bg-gray-700 text-gray-300'}`}
               >
-                {config.RISK_MANAGEMENT?.global_max_risk_amount ? 'Active' : 'Set Cap'}
+                {config.RISK_MANAGEMENT?.global_max_risk_amount ? 'Active' : (currency === 'INR' ? '₹2000' : '$50')}
               </button>
             </div>
+            <p className="text-[10px] text-gray-400">Hard limit on potential loss per trade.</p>
+          </div>
+
+          {/* Hard Daily Circuit Breaker */}
+          <div className="bg-darkBg/80 border border-borderColor p-3 rounded-xl space-y-2">
+            <div className="flex justify-between items-center text-gray-300">
+              <span className="font-semibold">Daily Loss Limit:</span>
+              <span className="text-amber-400 font-mono font-bold text-[11px]">Circuit Breaker</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                max="20"
+                step="1"
+                placeholder="e.g. 2"
+                value={config.RISK_MANAGEMENT?.max_daily_losses ?? 2}
+                onChange={(e) => updateField('RISK_MANAGEMENT.max_daily_losses', parseInt(e.target.value) || 2)}
+                className="w-full bg-cardBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white font-mono text-xs"
+              />
+              <span className="text-gray-400 text-[11px] whitespace-nowrap">Losses</span>
+            </div>
+            <p className="text-[10px] text-gray-400">Halts trading until 00:00 UTC if N losses hit today.</p>
           </div>
 
           {/* Global Fixed Lot Size */}
@@ -429,7 +533,7 @@ export const Configuration = () => {
           <div className="bg-darkBg/80 border border-borderColor p-3 rounded-xl space-y-2">
             <div className="flex justify-between items-center text-gray-300">
               <span className="font-semibold">Global Max Lot Cap:</span>
-              <span className="text-accentRed font-mono font-bold text-[11px]">Hard Ceiling</span>
+              <span className="text-accentRed font-mono font-bold text-[11px]">Ceiling</span>
             </div>
             <input
               type="number"
@@ -624,13 +728,13 @@ export const Configuration = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
               <div>
                 <label className="block text-gray-300 mb-1">Daily Loss Limit %</label>
                 <input
                   type="number"
                   step="0.5"
-                  value={config.RISK_MANAGEMENT?.daily_loss_limit || 10.0}
+                  value={config.RISK_MANAGEMENT?.daily_loss_limit || 4.0}
                   onChange={(e) => updateField('RISK_MANAGEMENT.daily_loss_limit', parseFloat(e.target.value))}
                   className="w-full bg-darkBg border border-borderColor rounded-lg px-3 py-2 text-white font-mono"
                 />
@@ -641,7 +745,18 @@ export const Configuration = () => {
                   type="number"
                   value={config.RISK_MANAGEMENT?.consecutive_loss_limit || 3}
                   onChange={(e) => updateField('RISK_MANAGEMENT.consecutive_loss_limit', parseInt(e.target.value))}
-                  className="w-full bg-darkBg border border-borderColor rounded-lg px-2.5 py-1.5 text-white"
+                  className="w-full bg-darkBg border border-borderColor rounded-lg px-3 py-2 text-white font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-300 mb-1">Max Daily Losses (Breaker)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={config.RISK_MANAGEMENT?.max_daily_losses ?? 2}
+                  onChange={(e) => updateField('RISK_MANAGEMENT.max_daily_losses', parseInt(e.target.value) || 2)}
+                  className="w-full bg-darkBg border border-borderColor rounded-lg px-3 py-2 text-white font-mono"
                 />
               </div>
             </div>

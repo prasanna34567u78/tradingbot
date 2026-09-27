@@ -95,7 +95,12 @@ RISK_MANAGEMENT = {   'consecutive_loss_limit': 3,
     'correlation_threshold': 0.7,
     'daily_loss_limit': 4,
     'dynamic_sizing': True,
+    'global_fixed_lot_size': None,
+    'global_max_lot_size': 0.1,
+    'global_max_risk_amount': None,
+    'global_risk_percent': 1.0,
     'max_correlated_risk': 39.5,
+    'max_daily_losses': 2,
     'max_daily_trades': 10,
     'max_drawdown_stop': 45,
     'max_total_risk': 76.5,
@@ -160,6 +165,7 @@ SWEEP_STRUCTURE_SETTINGS = {
     'min_base_bars':        2,         # Minimum consolidation base bars
     'max_base_bars':        10,        # Maximum consolidation base bars
     'sl_buffer_pts':        0.35,      # Stop loss buffer beyond sweep extreme
+    'max_sl_pts':           20.0,      # Maximum stop loss distance cap in points
     'buy_rr':               3.0,       # 1:3 Risk:Reward on BUY setups in Bullish Trend
     'sell_rr':              2.0,       # 1:2 Risk:Reward on SELL setups in Bearish Trend
     'session_filter':       True,      # Filter to winning sessions (Asian + NY Power)

@@ -345,7 +345,7 @@ class MT5Executor:
             actual_loss_usd = final_position_size * price_diff * contract_mult
             actual_loss_acc = actual_loss_usd * usd_rate
             
-            if max_money_risk is not None and float(max_money_risk) > 0 and actual_loss_acc > (float(max_money_risk) * 1.20):
+            if max_money_risk is not None and float(max_money_risk) > 0 and actual_loss_acc > (float(max_money_risk) * 1.05):
                 logger.warning(
                     f"[{symbol}] 🚨 TRADE BLOCKED BY HARD RISK POLICY: Potential Loss {actual_loss_acc:.2f} {account_currency} "
                     f"exceeds Maximum Risk Limit of {float(max_money_risk):.2f} {account_currency} (SL Distance: {price_diff:.2f} pts). "

@@ -105,7 +105,12 @@ RISK_MANAGEMENT = {
     'max_drawdown_stop': 8.0,  # Reduced stop trading at 8% drawdown
     'daily_loss_limit': 3.0,  # Reduced daily loss limit percentage
     'consecutive_loss_limit': 3,  # Stop after 3 consecutive losses
+    'max_daily_losses': 2,        # Circuit Breaker: Halt trading after N losses in a single day
     'max_daily_trades': 10,  # Maximum trades per day
+    'global_max_risk_amount': None, # Absolute maximum money risk per trade (e.g. $50 USD or ₹2000 INR)
+    'global_risk_percent': 1.0,   # Global risk percent per trade
+    'global_fixed_lot_size': None,# Fixed lot size override
+    'global_max_lot_size': 0.10,  # Hard maximum lot ceiling
 }
 
 # Advanced Trailing Configuration
@@ -196,6 +201,7 @@ SWEEP_STRUCTURE_SETTINGS = {
     'min_base_bars':        2,         # Minimum consolidation base bars
     'max_base_bars':        10,        # Maximum consolidation base bars
     'sl_buffer_pts':        0.35,      # Stop loss buffer beyond sweep extreme
+    'max_sl_pts':           20.0,      # Maximum stop loss distance cap in points
     'buy_rr':               3.0,       # 1:3 Risk:Reward on BUY setups in Bullish Trend
     'sell_rr':              2.0,       # 1:2 Risk:Reward on SELL setups in Bearish Trend
     'session_filter':       True,      # Filter to winning sessions (Asian + NY Power)

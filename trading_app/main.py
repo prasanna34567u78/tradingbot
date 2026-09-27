@@ -404,6 +404,8 @@ class GoldTradingBot:
         
         # Risk management & Execution Cooldowns
         self.daily_pnl = 0.0
+        self.daily_loss_count = 0
+        self.daily_win_count = 0
         self.max_daily_loss = config.RISK_MANAGEMENT.get('daily_loss_limit', 5.0)
         self.correlation_matrix = {}
         self.last_correlation_update = 0
@@ -416,6 +418,55 @@ class GoldTradingBot:
         self.scheduler = BackgroundScheduler()
         self.running = False
         logger.info(f"All components initialized successfully. Active symbols: {self.active_symbols}")
+
+    def get_daily_trading_stats(self):
+        """
+        Query MT5 history deals for today (from 00:00 UTC) to accurately calculate:
+          - daily_losses: number of closed losing trades today
+          - daily_wins: number of closed winning trades today
+          - daily_pnl: net realized profit/loss today
+          - consecutive_losses: current consecutive loss streak
+        """
+        losses = self.daily_loss_count
+        wins = self.daily_win_count
+        pnl = self.daily_pnl
+        consecutive_losses = 0
+        try:
+            from datetime import datetime, timezone
+            import MetaTrader5 as mt5
+
+            now_utc = datetime.now(timezone.utc)
+            today_start = datetime(now_utc.year, now_utc.month, now_utc.day, tzinfo=timezone.utc)
+
+            deals = mt5.history_deals_get(today_start, datetime.now())
+            if deals:
+                losses = 0
+                wins = 0
+                pnl = 0.0
+                consecutive_losses = 0
+                sorted_deals = sorted(deals, key=lambda d: d.time)
+                for d in sorted_deals:
+                    if d.entry == 1:  # DEAL_ENTRY_OUT (exit deal)
+                        deal_pnl = d.profit + d.swap + d.commission
+                        pnl += deal_pnl
+                        if deal_pnl < -0.01:
+                            losses += 1
+                            consecutive_losses += 1
+                        elif deal_pnl > 0.01:
+                            wins += 1
+                            consecutive_losses = 0
+                self.daily_loss_count = losses
+                self.daily_win_count = wins
+                self.daily_pnl = round(pnl, 2)
+        except Exception as e:
+            logger.debug(f"Could not read MT5 history deals for daily stats: {e}")
+
+        return {
+            'daily_losses': losses,
+            'daily_wins': wins,
+            'daily_pnl': round(pnl, 2),
+            'consecutive_losses': consecutive_losses
+        }
 
     def update_correlations(self):
         """
@@ -437,9 +488,52 @@ class GoldTradingBot:
 
     def check_global_risk_limits(self):
         """
-        Check global risk limits across all symbols
+        Check global risk limits across all symbols:
+          1. Hard Daily Circuit Breaker (halts after N losses/day)
+          2. Consecutive Loss Limit (halts after N consecutive losses)
+          3. Daily Drawdown Limit (% of account)
+          4. Total open portfolio risk & Max positions
         """
         try:
+            # ── 1. Daily Circuit Breaker & Consecutive Loss Check ──
+            daily_stats = self.get_daily_trading_stats()
+            today_losses = daily_stats['daily_losses']
+            today_pnl = daily_stats['daily_pnl']
+            consec_losses = daily_stats['consecutive_losses']
+
+            max_daily_losses = config.RISK_MANAGEMENT.get('max_daily_losses', 2)
+            if max_daily_losses is not None and int(max_daily_losses) > 0:
+                if today_losses >= int(max_daily_losses):
+                    logger.warning(
+                        f"🛡️ HARD DAILY CIRCUIT BREAKER ACTIVE: {today_losses}/{max_daily_losses} losses reached today! "
+                        f"Trading halted until 00:00 UTC to protect capital (Today P&L: {today_pnl:+.2f})."
+                    )
+                    return False
+
+            consec_limit = config.RISK_MANAGEMENT.get('consecutive_loss_limit', 3)
+            if consec_limit is not None and int(consec_limit) > 0:
+                if consec_losses >= int(consec_limit):
+                    logger.warning(
+                        f"🛡️ CONSECUTIVE LOSS LIMIT REACHED: {consec_losses}/{consec_limit} consecutive losses. "
+                        f"Skipping new entries to prevent drawdown spirals."
+                    )
+                    return False
+
+            daily_loss_pct = config.RISK_MANAGEMENT.get('daily_loss_limit', 4.0)
+            if daily_loss_pct is not None and float(daily_loss_pct) > 0:
+                primary_executor = next(iter(self.executors.values()), None)
+                if primary_executor:
+                    acc_balance = primary_executor.get_balance()
+                    if acc_balance > 0:
+                        max_loss_money = acc_balance * (float(daily_loss_pct) / 100.0)
+                        if today_pnl <= -max_loss_money:
+                            logger.warning(
+                                f"🛡️ DAILY LOSS LIMIT HIT: Today P&L ({today_pnl:+.2f}) exceeded "
+                                f"-{daily_loss_pct}% daily loss cap (-{max_loss_money:.2f}). Trading halted."
+                            )
+                            return False
+
+            # ── 2. Check Open Portfolio Risk Limits ──
             total_risk = 0.0
             open_positions = 0
             
@@ -459,8 +553,9 @@ class GoldTradingBot:
                         total_risk += volume * price * 0.01  # Simplified risk calculation
             
             # Check maximum total risk
-            if total_risk > config.RISK_MANAGEMENT.get('max_total_risk', 3.0):
-                logger.warning(f"Global risk limit exceeded: {total_risk:.2f}%")
+            max_tot = config.RISK_MANAGEMENT.get('max_total_risk', 15.0)
+            if total_risk > max_tot:
+                logger.warning(f"Global risk limit exceeded: {total_risk:.2f}% > {max_tot}%")
                 return False
             
             # Check maximum number of positions
@@ -502,9 +597,12 @@ class GoldTradingBot:
         if profitable:
             self.symbol_cooldowns[symbol] = now_t + 90 # 1.5 minutes cooldown
             logger.info(f"[{symbol}] Trade WIN (+{profit:.2f}) - Cooldown active for 90s.")
+            self.daily_win_count = getattr(self, 'daily_win_count', 0) + 1
         else:
             self.symbol_cooldowns[symbol] = now_t + 300 # 5 minutes cooldown on loss
             logger.info(f"[{symbol}] Trade LOSS ({profit:.2f}) - 5-Minute (300s) Cooldown active to let market settle.")
+            self.daily_loss_count = getattr(self, 'daily_loss_count', 0) + 1
+        self.daily_pnl = getattr(self, 'daily_pnl', 0.0) + profit
 
         # Log trade result
         executor = self.executors.get(symbol)
